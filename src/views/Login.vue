@@ -2,33 +2,66 @@
   <div class="login-wrapper">
     <div class="login-box">
       <h2 class="title">登 录</h2>
-      
+
       <el-form :model="loginForm" class="login-form">
         <el-form-item>
-          <el-input 
-            v-model="loginForm.username" 
-            placeholder="手机号/用户名/邮箱" 
+          <el-input
+            v-model="loginForm.username"
+            placeholder="手机号/用户名/邮箱"
             :prefix-icon="User"
             class="custom-input"
           />
         </el-form-item>
-        
+
         <el-form-item>
-          <el-input 
-            v-model="loginForm.password" 
-            type="password" 
-            placeholder="请输入密码" 
+          <el-input
+            v-model="loginForm.password"
+            type="password"
+            placeholder="请输入密码"
             :prefix-icon="Lock"
             show-password
             class="custom-input"
           />
         </el-form-item>
 
-        <el-button type="primary" class="login-btn" round @click="handleLogin">登 录</el-button>
-        
+        <el-form-item>
+          <div class="role-switch">
+            <button
+              type="button"
+              class="role-option"
+              :class="{ active: loginForm.role === 'user' }"
+              @click="loginForm.role = 'user'"
+            >
+              普通用户
+            </button>
+
+            <button
+              type="button"
+              class="role-option"
+              :class="{ active: loginForm.role === 'admin' }"
+              @click="loginForm.role = 'admin'"
+            >
+              管理员
+            </button>
+          </div>
+        </el-form-item>
+
+        <el-button
+          type="primary"
+          class="login-btn"
+          round
+          @click="handleLogin"
+        >
+          登 录
+        </el-button>
+
         <div class="extra-links">
-          <a href="#" @click.prevent="router.push('/forgot-password')">忘记密码？</a>
-          <a href="#" @click.prevent="router.push('/register')">立即注册</a>
+          <a href="#" @click.prevent="router.push('/forgot-password')">
+            忘记密码？
+          </a>
+          <a href="#" @click.prevent="router.push('/register')">
+            立即注册
+          </a>
         </div>
       </el-form>
     </div>
@@ -38,14 +71,29 @@
 <script setup>
 import { reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 
 const router = useRouter()
-const loginForm = reactive({ username: '', password: '' })
+
+const loginForm = reactive({
+  username: '',
+  password: '',
+  role: 'user'
+})
 
 const handleLogin = () => {
-  // 模拟登录成功，跳转到系统主框架下的首页
-  router.push('/home')
+  if (!loginForm.username || !loginForm.password) {
+    ElMessage.warning('请输入账号和密码')
+    return
+  }
+
+  // 当前阶段仅做前端分流；真实登录校验后续由后端接口接入
+  if (loginForm.role === 'admin') {
+    router.push('/admin/dashboard')
+  } else {
+    router.push('/home')
+  }
 }
 </script>
 
@@ -53,13 +101,10 @@ const handleLogin = () => {
 /* 1. 全屏背景图设置 */
 .login-wrapper {
   height: 100vh;
-  /* 1. 将 100vw 改为 100%，让它严格贴合父元素的真实宽度 */
-  width: 100%; 
-  /* 2. 新增 overflow: hidden，强制裁剪所有溢出部分，彻底锁死滑动 */
-  overflow: hidden; 
-  /* 3. 新增 box-sizing，保证你写的 padding-right 不会额外撑破宽度 */
-  box-sizing: border-box; 
-  
+  width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+
   background: url('../assets/images/bg.png') no-repeat center center;
   background-size: cover;
   display: flex;
@@ -68,45 +113,82 @@ const handleLogin = () => {
   padding-right: 15%;
 }
 
-/* 2. 浅蓝色登录卡片（高度还原你的设计） */
+/* 2. 浅蓝色登录卡片 */
 .login-box {
   width: 380px;
-  /* 你的设计图里的浅蓝色背景 */
-  background-color: #8bb1d3; 
-  padding: 60px 40px;
-  /* 添加轻微的阴影和圆角 */
+  background-color: #8bb1d3;
+  padding: 58px 40px;
   border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   text-align: center;
-  /* 如果你的卡片上下带有那种白色泼墨图案，可以把它切成透明 png 作为这个 box 的 background */
 }
 
 .title {
   color: #1a4f82;
   font-size: 28px;
   letter-spacing: 5px;
-  margin-bottom: 40px;
+  margin-bottom: 36px;
 }
 
-/* 3. 输入框深度美化：去掉边框，只留底线 (还原你的设计) */
+/* 3. 输入框深度美化：去掉边框，只留底线 */
 :deep(.custom-input .el-input__wrapper) {
-  background-color: transparent !important; /* 背景全透明 */
-  box-shadow: none !important; /* 去掉四周的框线 */
-  border-bottom: 1px solid white !important; /* 只有底部一条白线 */
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border-bottom: 1px solid white !important;
   border-radius: 0;
   padding-left: 0;
 }
+
 :deep(.custom-input input) {
-  color: white; /* 输入的文字是白色的 */
-}
-:deep(.custom-input input::placeholder) {
-  color: rgba(255,255,255,0.7); /* 提示文字颜色 */
-}
-:deep(.el-input__prefix) {
-  color: white; /* 图标颜色 */
+  color: white;
 }
 
-/* 4. 按钮美化 */
+:deep(.custom-input input::placeholder) {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+:deep(.el-input__prefix) {
+  color: white;
+}
+
+/* 4. 登录身份切换 */
+.role-switch {
+  width: 100%;
+  height: 40px;
+  padding: 4px;
+  display: flex;
+  gap: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.role-option {
+  flex: 1;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  color: white;
+  font-size: 14px;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.role-option.active {
+  color: #1a4f82;
+  font-weight: 700;
+  background: white;
+  box-shadow: 0 6px 14px rgba(26, 79, 130, 0.16);
+}
+
+.role-option:hover {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.role-option.active:hover {
+  background: white;
+}
+
+/* 5. 按钮美化 */
 .login-btn {
   width: 100%;
   margin-top: 20px;
@@ -117,6 +199,7 @@ const handleLogin = () => {
   letter-spacing: 5px;
   height: 45px;
 }
+
 .login-btn:hover {
   background-color: #f0f0f0;
   color: #8bb1d3;
@@ -129,10 +212,12 @@ const handleLogin = () => {
   margin-top: 20px;
   font-size: 13px;
 }
+
 .extra-links a {
   color: white;
   text-decoration: none;
 }
+
 .extra-links a:hover {
   text-decoration: underline;
 }

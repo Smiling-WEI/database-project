@@ -1,18 +1,39 @@
 <template>
-  <div class="admin-list-container">
-    <h2>🛠️ 管理员账号管理</h2>
-    <p>这里是管理员列表的占位页面，后续代码写在这里。</p>
+  <div class="admin-layout">
+    <AppSidebar />
+
+    <div class="admin-main">
+      <AppHeader />
+
+      <main class="admin-content">
+        <router-view />
+      </main>
+    </div>
   </div>
 </template>
 
 <script setup>
-// 这里写逻辑
+import AppSidebar from '../components/admin/AppSidebar.vue'
+import AppHeader from '../components/admin/AppHeader.vue'
 </script>
 
 <style scoped>
-.admin-list-container {
-  padding: 20px;
-  background-color: white;
-  border-radius: 8px;
+.admin-layout {
+  min-height: 100vh;
+  display: flex;
+  background: linear-gradient(135deg, #eaf4ff 0%, #f7fbff 45%, #eef7ff 100%);
+}
+
+.admin-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-content {
+  flex: 1;
+  padding: 24px;
+  overflow: auto;
 }
 </style>
