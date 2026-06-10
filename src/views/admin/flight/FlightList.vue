@@ -45,7 +45,7 @@
         <el-form-item label="航班号">
           <el-input
             v-model="queryForm.flightNo"
-            placeholder="前端筛选预留"
+            placeholder="请输入航班号"
             clearable
           />
         </el-form-item>
@@ -64,12 +64,12 @@
     <!-- 表格区域 -->
     <div class="table-card">
       <el-table
-        :data="filteredFlights"
+        :data="pagedFlights"
         stripe
         border
         table-layout="fixed"
         style="width: 100%"
-        empty-text="暂无航班数据，待后端接口接入"
+        empty-text="暂无航班数据"
       >
         <el-table-column prop="instanceId" label="实例ID" width="90" />
         <el-table-column prop="flightNo" label="航班号" width="110" />
@@ -84,7 +84,7 @@
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">
-              {{ row.status }}
+              {{ row.status || '未知' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -112,10 +112,11 @@
 
       <div class="pagination-wrap">
         <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
           background
           layout="total, prev, pager, next"
           :total="filteredFlights.length"
-          :page-size="10"
         />
       </div>
     </div>
@@ -137,27 +138,43 @@ const queryForm = reactive({
   flightNo: ''
 })
 
-// 后续由后端接口赋值，例如：flightList.value = 接口返回的航班数组
+const pagination = reactive({
+  currentPage: 1,
+  pageSize: 10
+})
+
 const flightList = ref([])
 
 const filteredFlights = computed(() => {
   return flightList.value.filter((item) => {
     const matchDate = !queryForm.date || item.flightDate === queryForm.date
     const matchStatus = !queryForm.status || item.status === queryForm.status
-    const matchFlightNo = !queryForm.flightNo || item.flightNo?.includes(queryForm.flightNo)
+    const matchFlightNo =
+      !queryForm.flightNo ||
+      String(item.flightNo || '')
+        .toLowerCase()
+        .includes(queryForm.flightNo.toLowerCase())
 
     return matchDate && matchStatus && matchFlightNo
   })
 })
 
+const pagedFlights = computed(() => {
+  const start = (pagination.currentPage - 1) * pagination.pageSize
+  const end = start + pagination.pageSize
+
+  return filteredFlights.value.slice(start, end)
+})
+
 const handleSearch = () => {
-  ElMessage.info('查询条件已更新，待后端接口接入后获取真实数据')
+  pagination.currentPage = 1
 }
 
 const handleReset = () => {
   queryForm.date = ''
   queryForm.status = ''
   queryForm.flightNo = ''
+  pagination.currentPage = 1
 }
 
 const goAddFlight = () => {
@@ -173,8 +190,13 @@ const goEditFlight = (row) => {
   })
 }
 
-const handleIrregularity = () => {
-  ElMessage.info('发布航班异常功能待后端接口接入')
+const handleIrregularity = (row) => {
+  if (!row?.instanceId) {
+    ElMessage.warning('未找到对应航班信息')
+    return
+  }
+
+  ElMessage.info('请在编辑页面维护该航班状态')
 }
 
 const getStatusType = (status) => {

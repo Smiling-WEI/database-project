@@ -47,7 +47,7 @@
         <el-form-item label="乘机人">
           <el-input
             v-model="queryForm.passengerName"
-            placeholder="前端筛选预留"
+            placeholder="请输入乘机人"
             clearable
           />
         </el-form-item>
@@ -66,12 +66,12 @@
     <!-- 表格区域 -->
     <div class="table-card">
       <el-table
-        :data="filteredOrders"
+        :data="pagedOrders"
         stripe
         border
         table-layout="fixed"
         style="width: 100%"
-        empty-text="暂无订单数据，待后端接口接入"
+        empty-text="暂无订单数据"
       >
         <el-table-column prop="orderId" label="订单ID" width="100" />
         <el-table-column prop="username" label="用户账号" width="120" show-overflow-tooltip />
@@ -80,6 +80,7 @@
         <el-table-column prop="flightDate" label="航班日期" width="120" />
         <el-table-column prop="cabinType" label="舱位" width="100" />
         <el-table-column prop="seatNo" label="座位号" width="100" />
+
         <el-table-column prop="price" label="票价" width="100">
           <template #default="{ row }">
             <span v-if="row.price !== undefined && row.price !== null">
@@ -94,20 +95,20 @@
         <el-table-column label="订单状态" width="120">
           <template #default="{ row }">
             <el-tag :type="getOrderStatusType(row.orderStatus)">
-              {{ row.orderStatus }}
+              {{ row.orderStatus || '未知' }}
             </el-tag>
           </template>
         </el-table-column>
 
         <el-table-column label="记录类型" width="110">
           <template #default="{ row }">
-            <el-tag :type="row.recordType === '有效订单' ? 'success' : 'info'">
-              {{ row.recordType }}
+            <el-tag :type="getRecordType(row.recordType)">
+              {{ row.recordType || '未知' }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" fixed="right" width="140">
+        <el-table-column label="操作" fixed="right" width="100">
           <template #default="{ row }">
             <el-button
               type="primary"
@@ -116,23 +117,17 @@
             >
               查看
             </el-button>
-            <el-button
-              type="info"
-              link
-              @click="handleTodo"
-            >
-              待接入
-            </el-button>
           </template>
         </el-table-column>
       </el-table>
 
       <div class="pagination-wrap">
         <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
           background
           layout="total, prev, pager, next"
           :total="filteredOrders.length"
-          :page-size="10"
         />
       </div>
     </div>
@@ -146,65 +141,66 @@
       <div v-if="currentOrder" class="detail-box">
         <div class="detail-row">
           <span>订单ID</span>
-          <strong>{{ currentOrder.orderId }}</strong>
+          <strong>{{ formatValue(currentOrder.orderId) }}</strong>
         </div>
         <div class="detail-row">
           <span>用户ID</span>
-          <strong>{{ currentOrder.userId }}</strong>
+          <strong>{{ formatValue(currentOrder.userId) }}</strong>
         </div>
         <div class="detail-row">
           <span>用户账号</span>
-          <strong>{{ currentOrder.username }}</strong>
+          <strong>{{ formatValue(currentOrder.username) }}</strong>
         </div>
         <div class="detail-row">
           <span>乘机人</span>
-          <strong>{{ currentOrder.passengerName }}</strong>
+          <strong>{{ formatValue(currentOrder.passengerName) }}</strong>
         </div>
         <div class="detail-row">
           <span>乘机人证件</span>
-          <strong>{{ currentOrder.passengerIdCard }}</strong>
+          <strong>{{ formatValue(currentOrder.passengerIdCard) }}</strong>
         </div>
         <div class="detail-row">
           <span>航班号</span>
-          <strong>{{ currentOrder.flightNo }}</strong>
+          <strong>{{ formatValue(currentOrder.flightNo) }}</strong>
         </div>
         <div class="detail-row">
           <span>航班日期</span>
-          <strong>{{ currentOrder.flightDate }}</strong>
+          <strong>{{ formatValue(currentOrder.flightDate) }}</strong>
         </div>
         <div class="detail-row">
           <span>舱位</span>
-          <strong>{{ currentOrder.cabinType }}</strong>
+          <strong>{{ formatValue(currentOrder.cabinType) }}</strong>
         </div>
         <div class="detail-row">
           <span>座位号</span>
-          <strong>{{ currentOrder.seatNo }}</strong>
+          <strong>{{ formatValue(currentOrder.seatNo) }}</strong>
         </div>
         <div class="detail-row">
           <span>票价</span>
-          <strong>¥{{ currentOrder.price }}</strong>
+          <strong>{{ formatPrice(currentOrder.price) }}</strong>
         </div>
         <div class="detail-row">
           <span>购票时间</span>
-          <strong>{{ currentOrder.purchaseTime }}</strong>
+          <strong>{{ formatValue(currentOrder.purchaseTime) }}</strong>
         </div>
         <div class="detail-row">
           <span>订单状态</span>
           <el-tag :type="getOrderStatusType(currentOrder.orderStatus)">
-            {{ currentOrder.orderStatus }}
+            {{ currentOrder.orderStatus || '未知' }}
           </el-tag>
         </div>
         <div class="detail-row">
           <span>记录类型</span>
-          <el-tag :type="currentOrder.recordType === '有效订单' ? 'success' : 'info'">
-            {{ currentOrder.recordType }}
+          <el-tag :type="getRecordType(currentOrder.recordType)">
+            {{ currentOrder.recordType || '未知' }}
           </el-tag>
         </div>
       </div>
 
       <el-empty
         v-else
-        description="暂无订单详情，待后端数据接入"
+        description="暂无订单详情"
+        :image-size="90"
       />
 
       <template #footer>
@@ -218,7 +214,6 @@
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import PageContainer from '../../../components/admin/PageContainer.vue'
 
 const queryForm = reactive({
@@ -228,26 +223,51 @@ const queryForm = reactive({
   passengerName: ''
 })
 
+const pagination = reactive({
+  currentPage: 1,
+  pageSize: 10
+})
+
 const detailVisible = ref(false)
 const currentOrder = ref(null)
 
-// 后续由后端接口赋值，例如：orderList.value = 接口返回的订单数组
 const orderList = ref([])
 
 const filteredOrders = computed(() => {
   return orderList.value.filter((item) => {
-    const matchFlightNo = !queryForm.flightNo || item.flightNo?.includes(queryForm.flightNo)
-    const matchOrderStatus = !queryForm.orderStatus || item.orderStatus === queryForm.orderStatus
-    const matchRecordType = !queryForm.recordType || item.recordType === queryForm.recordType
+    const matchFlightNo =
+      !queryForm.flightNo ||
+      String(item.flightNo || '')
+        .toLowerCase()
+        .includes(queryForm.flightNo.toLowerCase())
+
+    const matchOrderStatus =
+      !queryForm.orderStatus ||
+      item.orderStatus === queryForm.orderStatus
+
+    const matchRecordType =
+      !queryForm.recordType ||
+      item.recordType === queryForm.recordType
+
     const matchPassengerName =
-      !queryForm.passengerName || item.passengerName?.includes(queryForm.passengerName)
+      !queryForm.passengerName ||
+      String(item.passengerName || '')
+        .toLowerCase()
+        .includes(queryForm.passengerName.toLowerCase())
 
     return matchFlightNo && matchOrderStatus && matchRecordType && matchPassengerName
   })
 })
 
+const pagedOrders = computed(() => {
+  const start = (pagination.currentPage - 1) * pagination.pageSize
+  const end = start + pagination.pageSize
+
+  return filteredOrders.value.slice(start, end)
+})
+
 const handleSearch = () => {
-  ElMessage.info('查询条件已更新，待后端接口接入后获取真实数据')
+  pagination.currentPage = 1
 }
 
 const handleReset = () => {
@@ -255,6 +275,7 @@ const handleReset = () => {
   queryForm.orderStatus = ''
   queryForm.recordType = ''
   queryForm.passengerName = ''
+  pagination.currentPage = 1
 }
 
 const handleView = (row) => {
@@ -262,8 +283,20 @@ const handleView = (row) => {
   detailVisible.value = true
 }
 
-const handleTodo = () => {
-  ElMessage.info('该操作待后端接口接入')
+const formatValue = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return '-'
+  }
+
+  return value
+}
+
+const formatPrice = (price) => {
+  if (price === undefined || price === null || price === '') {
+    return '-'
+  }
+
+  return `¥${price}`
 }
 
 const getOrderStatusType = (status) => {
@@ -271,6 +304,12 @@ const getOrderStatusType = (status) => {
   if (status === '已退票') return 'info'
   if (status === '已改签') return 'warning'
   if (status === '已取消') return 'danger'
+  return 'info'
+}
+
+const getRecordType = (recordType) => {
+  if (recordType === '有效订单') return 'success'
+  if (recordType === '历史订单') return 'info'
   return 'info'
 }
 </script>

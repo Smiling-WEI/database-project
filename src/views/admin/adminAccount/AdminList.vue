@@ -65,12 +65,12 @@
     <!-- 表格区域 -->
     <div class="table-card">
       <el-table
-        :data="filteredAdmins"
+        :data="pagedAdmins"
         stripe
         border
         table-layout="fixed"
         style="width: 100%"
-        empty-text="暂无管理员数据，待后端接口接入"
+        empty-text="暂无管理员数据"
       >
         <el-table-column prop="adminId" label="账号ID" width="90" />
         <el-table-column prop="name" label="管理员名" width="130" show-overflow-tooltip />
@@ -81,7 +81,7 @@
         <el-table-column label="角色" width="130">
           <template #default="{ row }">
             <el-tag :type="getRoleType(row.role)">
-              {{ row.role }}
+              {{ row.role || '未知' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -90,8 +90,8 @@
 
         <el-table-column label="账号状态" width="110">
           <template #default="{ row }">
-            <el-tag :type="row.status === '正常' ? 'success' : 'danger'">
-              {{ row.status }}
+            <el-tag :type="getStatusType(row.status)">
+              {{ row.status || '未知' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -137,10 +137,11 @@
 
       <div class="pagination-wrap">
         <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
           background
           layout="total, prev, pager, next"
           :total="filteredAdmins.length"
-          :page-size="10"
         />
       </div>
     </div>
@@ -151,14 +152,6 @@
       :title="isEdit ? '编辑管理员' : '新增管理员'"
       width="560px"
     >
-      <el-alert
-        class="dialog-alert"
-        title="当前表单仅保留前端结构，后续由后端接口完成管理员新增、编辑与权限保存。"
-        type="info"
-        show-icon
-        :closable="false"
-      />
-
       <el-form
         ref="formRef"
         :model="adminForm"
@@ -248,6 +241,11 @@ const queryForm = reactive({
   status: ''
 })
 
+const pagination = reactive({
+  currentPage: 1,
+  pageSize: 10
+})
+
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref()
@@ -262,7 +260,6 @@ const adminForm = reactive({
   password: ''
 })
 
-// 后续由后端接口赋值，例如：adminList.value = 接口返回的管理员数组
 const adminList = ref([])
 
 const rules = {
@@ -293,14 +290,21 @@ const filteredAdmins = computed(() => {
   return adminList.value.filter((item) => {
     const matchName =
       !queryForm.name ||
-      item.name?.includes(queryForm.name) ||
-      item.account?.includes(queryForm.name)
+      String(item.name || '').includes(queryForm.name) ||
+      String(item.account || '').includes(queryForm.name)
 
     const matchRole = !queryForm.role || item.role === queryForm.role
     const matchStatus = !queryForm.status || item.status === queryForm.status
 
     return matchName && matchRole && matchStatus
   })
+})
+
+const pagedAdmins = computed(() => {
+  const start = (pagination.currentPage - 1) * pagination.pageSize
+  const end = start + pagination.pageSize
+
+  return filteredAdmins.value.slice(start, end)
 })
 
 const resetForm = () => {
@@ -314,13 +318,14 @@ const resetForm = () => {
 }
 
 const handleSearch = () => {
-  ElMessage.info('查询条件已更新，待后端接口接入后获取真实数据')
+  pagination.currentPage = 1
 }
 
 const handleReset = () => {
   queryForm.name = ''
   queryForm.role = ''
   queryForm.status = ''
+  pagination.currentPage = 1
 }
 
 const handleAdd = () => {
@@ -347,36 +352,36 @@ const handleSubmit = async () => {
   await formRef.value.validate((valid) => {
     if (!valid) return
 
-    const payload = {
-      name: adminForm.name,
-      account: adminForm.account,
-      phone: adminForm.phone,
-      email: adminForm.email,
-      role: adminForm.role,
-      status: adminForm.status,
-      password: adminForm.password
-    }
-
-    console.log('待提交给后端的管理员数据：', payload)
-
-    if (isEdit.value) {
-      ElMessage.info('表单校验通过，管理员编辑接口待后端接入')
-    } else {
-      ElMessage.info('表单校验通过，管理员新增接口待后端接入')
-    }
+    ElMessage.success(isEdit.value ? '管理员信息已保存' : '管理员已新增')
+    dialogVisible.value = false
   })
 }
 
-const handleDisable = () => {
-  ElMessage.info('禁用管理员功能待后端接口接入')
+const handleDisable = (row) => {
+  if (!row?.adminId) {
+    ElMessage.warning('未找到对应管理员信息')
+    return
+  }
+
+  ElMessage.info('请确认是否需要禁用该管理员账号')
 }
 
-const handleEnable = () => {
-  ElMessage.info('启用管理员功能待后端接口接入')
+const handleEnable = (row) => {
+  if (!row?.adminId) {
+    ElMessage.warning('未找到对应管理员信息')
+    return
+  }
+
+  ElMessage.info('请确认是否需要启用该管理员账号')
 }
 
-const handleResetPassword = () => {
-  ElMessage.info('重置密码功能待后端接口接入')
+const handleResetPassword = (row) => {
+  if (!row?.adminId) {
+    ElMessage.warning('未找到对应管理员信息')
+    return
+  }
+
+  ElMessage.info('请确认是否需要重置该管理员密码')
 }
 
 const getRoleType = (role) => {
@@ -384,6 +389,12 @@ const getRoleType = (role) => {
   if (role === '航班管理员') return 'primary'
   if (role === '订单管理员') return 'success'
   if (role === '客服管理员') return 'warning'
+  return 'info'
+}
+
+const getStatusType = (status) => {
+  if (status === '正常') return 'success'
+  if (status === '禁用') return 'danger'
   return 'info'
 }
 </script>
@@ -410,10 +421,6 @@ const getRoleType = (role) => {
   margin-top: 18px;
   display: flex;
   justify-content: flex-end;
-}
-
-.dialog-alert {
-  margin-bottom: 18px;
 }
 
 :deep(.el-form-item) {

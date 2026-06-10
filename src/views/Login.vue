@@ -3,17 +3,23 @@
     <div class="login-box">
       <h2 class="title">登 录</h2>
 
-      <el-form :model="loginForm" class="login-form">
-        <el-form-item>
+      <el-form
+        ref="formRef"
+        :model="loginForm"
+        :rules="rules"
+        class="login-form"
+      >
+        <el-form-item prop="username">
           <el-input
             v-model="loginForm.username"
             placeholder="手机号/用户名/邮箱"
             :prefix-icon="User"
             class="custom-input"
+            clearable
           />
         </el-form-item>
 
-        <el-form-item>
+        <el-form-item prop="password">
           <el-input
             v-model="loginForm.password"
             type="password"
@@ -24,7 +30,7 @@
           />
         </el-form-item>
 
-        <el-form-item>
+        <el-form-item prop="role">
           <div class="role-switch">
             <button
               type="button"
@@ -50,6 +56,7 @@
           type="primary"
           class="login-btn"
           round
+          :loading="loading"
           @click="handleLogin"
         >
           登 录
@@ -69,12 +76,14 @@
 </template>
 
 <script setup>
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 
 const router = useRouter()
+const formRef = ref()
+const loading = ref(false)
 
 const loginForm = reactive({
   username: '',
@@ -82,29 +91,47 @@ const loginForm = reactive({
   role: 'user'
 })
 
-const handleLogin = () => {
-  if (!loginForm.username || !loginForm.password) {
-    ElMessage.warning('请输入账号和密码')
-    return
-  }
+const rules = {
+  username: [
+    { required: true, message: '请输入账号', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' }
+  ],
+  role: [
+    { required: true, message: '请选择登录身份', trigger: 'change' }
+  ]
+}
 
-  // 当前阶段仅做前端分流；真实登录校验后续由后端接口接入
-  if (loginForm.role === 'admin') {
-    router.push('/admin/dashboard')
-  } else {
-    router.push('/home')
-  }
+const handleLogin = async () => {
+  if (!formRef.value) return
+
+  await formRef.value.validate((valid) => {
+    if (!valid) return
+
+    loading.value = true
+
+    try {
+      if (loginForm.role === 'admin') {
+        router.push('/admin/dashboard')
+      } else {
+        router.push('/home')
+      }
+    } catch (error) {
+      ElMessage.error('登录失败，请稍后重试')
+    } finally {
+      loading.value = false
+    }
+  })
 }
 </script>
 
 <style scoped>
-/* 1. 全屏背景图设置 */
 .login-wrapper {
   height: 100vh;
   width: 100%;
   overflow: hidden;
   box-sizing: border-box;
-
   background: url('../assets/images/bg.png') no-repeat center center;
   background-size: cover;
   display: flex;
@@ -113,7 +140,6 @@ const handleLogin = () => {
   padding-right: 15%;
 }
 
-/* 2. 浅蓝色登录卡片 */
 .login-box {
   width: 380px;
   background-color: #8bb1d3;
@@ -130,7 +156,6 @@ const handleLogin = () => {
   margin-bottom: 36px;
 }
 
-/* 3. 输入框深度美化：去掉边框，只留底线 */
 :deep(.custom-input .el-input__wrapper) {
   background-color: transparent !important;
   box-shadow: none !important;
@@ -151,7 +176,10 @@ const handleLogin = () => {
   color: white;
 }
 
-/* 4. 登录身份切换 */
+:deep(.el-form-item__error) {
+  color: #fff7ed;
+}
+
 .role-switch {
   width: 100%;
   height: 40px;
@@ -188,7 +216,6 @@ const handleLogin = () => {
   background: white;
 }
 
-/* 5. 按钮美化 */
 .login-btn {
   width: 100%;
   margin-top: 20px;
@@ -205,7 +232,6 @@ const handleLogin = () => {
   color: #8bb1d3;
 }
 
-/* 底部链接 */
 .extra-links {
   display: flex;
   justify-content: space-between;

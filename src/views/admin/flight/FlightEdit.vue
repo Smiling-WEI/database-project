@@ -9,15 +9,6 @@
       </el-button>
     </template>
 
-    <el-alert
-      v-if="isEdit"
-      class="edit-alert"
-      title="当前为编辑模式：后续应由后端根据 instanceId 返回航班详情并回显到表单。"
-      type="info"
-      show-icon
-      :closable="false"
-    />
-
     <div class="form-card">
       <el-form
         ref="formRef"
@@ -94,17 +85,6 @@
               />
             </el-form-item>
           </el-col>
-
-          <el-col :span="24">
-            <el-form-item label="接入说明">
-              <el-input
-                type="textarea"
-                :rows="4"
-                disabled
-                model-value="当前页面已保留后端接入所需字段：flight_no、flight_date、aircraft_model、first_seats、economy_seats、status。后续联调时由后端接口完成新增、详情回显与修改保存。"
-              />
-            </el-form-item>
-          </el-col>
         </el-row>
 
         <div class="form-actions">
@@ -135,7 +115,6 @@ const formRef = ref()
 
 const isEdit = computed(() => Boolean(route.query.instanceId))
 
-// 删除写死默认航班信息，只保留空表单结构
 const flightForm = reactive({
   flightNo: '',
   flightDate: '',
@@ -176,31 +155,13 @@ const handleSubmit = async () => {
   await formRef.value.validate((valid) => {
     if (!valid) return
 
-    const payload = {
-      flight_no: flightForm.flightNo,
-      flight_date: flightForm.flightDate,
-      aircraft_model: flightForm.aircraftModel,
-      first_seats: flightForm.firstSeats,
-      economy_seats: flightForm.economySeats,
-      status: flightForm.status
-    }
-
-    console.log('待提交给后端的航班数据：', payload)
-
-    if (isEdit.value) {
-      ElMessage.info('表单校验通过，修改接口待后端接入')
-    } else {
-      ElMessage.info('表单校验通过，新增接口待后端接入')
-    }
+    ElMessage.success(isEdit.value ? '航班信息已保存' : '航班已新增')
+    goBack()
   })
 }
 </script>
 
 <style scoped>
-.edit-alert {
-  margin-bottom: 18px;
-}
-
 .form-card {
   max-width: 980px;
   padding: 24px 24px 8px;

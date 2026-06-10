@@ -1,9 +1,9 @@
 <template>
   <PageContainer
     title="控制台"
-    description="查看航空订票系统的核心运营数据与管理入口"
+    description="查看航空订票系统的核心运营数据与常用管理入口"
   >
-    <!-- 统计卡片：当前为待后端接入状态 -->
+    <!-- 统计卡片 -->
     <div class="stat-grid">
       <div
         v-for="item in statCards"
@@ -17,14 +17,15 @@
         </div>
 
         <div class="stat-info">
-          <div class="stat-value">{{ item.value }}</div>
+          <div class="stat-value">
+            {{ formatStatValue(item.value) }}
+          </div>
           <div class="stat-label">{{ item.label }}</div>
-          <div class="stat-note">待后端统计接口接入</div>
         </div>
       </div>
     </div>
 
-    <!-- 中间区域：快捷入口 + 系统提示 -->
+    <!-- 中间区域：快捷入口 + 系统提醒 -->
     <div class="dashboard-row">
       <section class="panel quick-panel">
         <div class="panel-header">
@@ -58,12 +59,12 @@
       <section class="panel notice-panel">
         <div class="panel-header">
           <div>
-            <h3>系统提示</h3>
-            <p>当前页面已完成前端结构，等待后端数据接入</p>
+            <h3>系统提醒</h3>
+            <p>查看当前需要关注的管理事项</p>
           </div>
         </div>
 
-        <div class="notice-list">
+        <div v-if="notices.length" class="notice-list">
           <div
             v-for="notice in notices"
             :key="notice.text"
@@ -79,17 +80,24 @@
             <span>{{ notice.text }}</span>
           </div>
         </div>
+
+        <el-empty
+          v-else
+          description="暂无系统提醒"
+          :image-size="90"
+        />
       </section>
     </div>
 
-    <!-- 底部区域：今日航班 + 近期订单，当前为空数据状态 -->
+    <!-- 底部区域：今日航班 + 近期订单 -->
     <div class="dashboard-row bottom-row">
       <section class="panel">
         <div class="panel-header">
           <div>
             <h3>今日航班概览</h3>
-            <p>后续由后端返回当前航司的今日航班数据</p>
+            <p>查看今日航班的基础运行情况</p>
           </div>
+
           <el-button type="primary" link @click="goTo('/admin/flights')">
             查看全部
           </el-button>
@@ -100,18 +108,19 @@
           stripe
           table-layout="fixed"
           style="width: 100%"
-          empty-text="暂无航班数据，待后端接口接入"
+          empty-text="暂无今日航班数据"
         >
           <el-table-column prop="flightNo" label="航班号" width="110" />
           <el-table-column prop="flightDate" label="航班日期" width="120" />
           <el-table-column prop="route" label="航线" show-overflow-tooltip />
+
           <el-table-column label="状态" width="100">
             <template #default="{ row }">
               <el-tag
                 :type="getFlightStatusType(row.status)"
                 size="small"
               >
-                {{ row.status }}
+                {{ row.status || '未知' }}
               </el-tag>
             </template>
           </el-table-column>
@@ -122,8 +131,9 @@
         <div class="panel-header">
           <div>
             <h3>近期订单</h3>
-            <p>后续由后端返回当前航司的近期订单数据</p>
+            <p>查看近期订单的处理状态</p>
           </div>
+
           <el-button type="primary" link @click="goTo('/admin/orders')">
             查看全部
           </el-button>
@@ -134,18 +144,19 @@
           stripe
           table-layout="fixed"
           style="width: 100%"
-          empty-text="暂无订单数据，待后端接口接入"
+          empty-text="暂无近期订单数据"
         >
           <el-table-column prop="orderId" label="订单ID" width="110" />
           <el-table-column prop="username" label="用户" width="100" />
           <el-table-column prop="flightNo" label="航班号" width="110" />
+
           <el-table-column label="状态" width="120">
             <template #default="{ row }">
               <el-tag
                 :type="getOrderStatusType(row.orderStatus)"
                 size="small"
               >
-                {{ row.orderStatus }}
+                {{ row.orderStatus || '未知' }}
               </el-tag>
             </template>
           </el-table-column>
@@ -156,8 +167,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   Promotion,
   Tickets,
@@ -165,36 +176,34 @@ import {
   Setting,
   Plus,
   List
-} from '@element-plus/icons-vue'
-import PageContainer from '../../components/admin/PageContainer.vue'
+} from '@element-plus/icons-vue';
+import PageContainer from '../../components/admin/PageContainer.vue';
 
-const router = useRouter()
+const router = useRouter();
 
-// 统计数据后续应由后端统计接口返回，这里只保留页面结构，不写入业务样本数据
-const statCards = [
+const statCards = ref([
   {
     label: '今日航班',
-    value: 0,
+    value: null,
     icon: Promotion
   },
   {
     label: '今日订单',
-    value: 0,
+    value: null,
     icon: Tickets
   },
   {
     label: '注册用户',
-    value: 0,
+    value: null,
     icon: User
   },
   {
     label: '系统管理员',
-    value: 0,
+    value: null,
     icon: Setting
   }
-]
+]);
 
-// 快捷入口属于页面导航配置，不属于业务样本数据，可以保留
 const quickActions = [
   {
     title: '新增航班',
@@ -210,7 +219,7 @@ const quickActions = [
   },
   {
     title: '订单管理',
-    desc: '查看订单与改签记录',
+    desc: '查看订单与处理状态',
     path: '/admin/orders',
     icon: List
   },
@@ -220,50 +229,42 @@ const quickActions = [
     path: '/admin/users',
     icon: User
   }
-]
+];
 
-// 系统提示为前端接入说明，不伪造真实业务数量
-const notices = [
-  {
-    label: '前端',
-    type: 'success',
-    text: '管理端核心页面结构已完成'
-  },
-  {
-    label: '数据',
-    type: 'info',
-    text: '统计卡片与表格数据等待后端接口接入'
-  },
-  {
-    label: '联调',
-    type: 'warning',
-    text: '后续由后端同学根据接口返回真实数据'
+const notices = ref([]);
+
+const todayFlights = ref([]);
+const recentOrders = ref([]);
+
+const formatStatValue = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return '--';
   }
-]
 
-// 删除写死业务实例，保留空数组作为后端接入位置
-const todayFlights = ref([])
-const recentOrders = ref([])
+  return value;
+};
 
 const goTo = (path) => {
-  router.push(path)
-}
+  router.push(path);
+};
 
 const getFlightStatusType = (status) => {
-  if (status === '正常') return 'success'
-  if (status === '延误') return 'warning'
-  if (status === '取消') return 'danger'
-  if (status === '已完成') return 'info'
-  return 'info'
-}
+  if (status === '正常') return 'success';
+  if (status === '延误') return 'warning';
+  if (status === '取消') return 'danger';
+  if (status === '已完成') return 'info';
+
+  return 'info';
+};
 
 const getOrderStatusType = (status) => {
-  if (status === '已支付') return 'success'
-  if (status === '待支付') return 'warning'
-  if (status === '已退票') return 'info'
-  if (status === '已取消') return 'info'
-  return 'info'
-}
+  if (status === '已支付') return 'success';
+  if (status === '待支付') return 'warning';
+  if (status === '已退票') return 'info';
+  if (status === '已取消') return 'info';
+
+  return 'info';
+};
 </script>
 
 <style scoped>
@@ -309,12 +310,6 @@ const getOrderStatusType = (status) => {
   margin-top: 8px;
   color: #64748b;
   font-size: 14px;
-}
-
-.stat-note {
-  margin-top: 6px;
-  color: #94a3b8;
-  font-size: 12px;
 }
 
 .dashboard-row {
@@ -425,6 +420,14 @@ const getOrderStatusType = (status) => {
   font-size: 14px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
+}
+
+:deep(.el-empty) {
+  padding: 12px 0;
+}
+
+:deep(.el-empty__description p) {
+  color: #94a3b8;
 }
 
 :deep(.el-table) {

@@ -52,12 +52,12 @@
     <!-- 表格区域 -->
     <div class="table-card">
       <el-table
-        :data="filteredUsers"
+        :data="pagedUsers"
         stripe
         border
         table-layout="fixed"
         style="width: 100%"
-        empty-text="暂无用户数据，待后端接口接入"
+        empty-text="暂无用户数据"
       >
         <el-table-column prop="userId" label="用户ID" width="90" />
         <el-table-column prop="username" label="用户账号" width="120" show-overflow-tooltip />
@@ -70,8 +70,8 @@
 
         <el-table-column label="账号状态" width="110">
           <template #default="{ row }">
-            <el-tag :type="row.status === '正常' ? 'success' : 'danger'">
-              {{ row.status }}
+            <el-tag :type="getStatusType(row.status)">
+              {{ row.status || '未知' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -109,10 +109,11 @@
 
       <div class="pagination-wrap">
         <el-pagination
+          v-model:current-page="pagination.currentPage"
+          v-model:page-size="pagination.pageSize"
           background
           layout="total, prev, pager, next"
           :total="filteredUsers.length"
-          :page-size="10"
         />
       </div>
     </div>
@@ -126,47 +127,48 @@
       <div v-if="currentUser" class="detail-box">
         <div class="detail-row">
           <span>用户ID</span>
-          <strong>{{ currentUser.userId }}</strong>
+          <strong>{{ formatValue(currentUser.userId) }}</strong>
         </div>
         <div class="detail-row">
           <span>用户账号</span>
-          <strong>{{ currentUser.username }}</strong>
+          <strong>{{ formatValue(currentUser.username) }}</strong>
         </div>
         <div class="detail-row">
           <span>真实姓名</span>
-          <strong>{{ currentUser.realName }}</strong>
+          <strong>{{ formatValue(currentUser.realName) }}</strong>
         </div>
         <div class="detail-row">
           <span>手机号</span>
-          <strong>{{ currentUser.phone }}</strong>
+          <strong>{{ formatValue(currentUser.phone) }}</strong>
         </div>
         <div class="detail-row">
           <span>邮箱</span>
-          <strong>{{ currentUser.email }}</strong>
+          <strong>{{ formatValue(currentUser.email) }}</strong>
         </div>
         <div class="detail-row">
           <span>常用乘机人</span>
-          <strong>{{ currentUser.passengerCount }} 人</strong>
+          <strong>{{ formatCount(currentUser.passengerCount, '人') }}</strong>
         </div>
         <div class="detail-row">
           <span>历史订单数</span>
-          <strong>{{ currentUser.orderCount }} 单</strong>
+          <strong>{{ formatCount(currentUser.orderCount, '单') }}</strong>
         </div>
         <div class="detail-row">
           <span>注册时间</span>
-          <strong>{{ currentUser.createdAt }}</strong>
+          <strong>{{ formatValue(currentUser.createdAt) }}</strong>
         </div>
         <div class="detail-row">
           <span>账号状态</span>
-          <el-tag :type="currentUser.status === '正常' ? 'success' : 'danger'">
-            {{ currentUser.status }}
+          <el-tag :type="getStatusType(currentUser.status)">
+            {{ currentUser.status || '未知' }}
           </el-tag>
         </div>
       </div>
 
       <el-empty
         v-else
-        description="暂无用户详情，待后端数据接入"
+        description="暂无用户详情"
+        :image-size="90"
       />
 
       <template #footer>
@@ -189,22 +191,26 @@ const queryForm = reactive({
   status: ''
 })
 
+const pagination = reactive({
+  currentPage: 1,
+  pageSize: 10
+})
+
 const detailVisible = ref(false)
 const currentUser = ref(null)
 
-// 后续由后端接口赋值，例如：userList.value = 接口返回的用户数组
 const userList = ref([])
 
 const filteredUsers = computed(() => {
   return userList.value.filter((item) => {
     const matchName =
       !queryForm.name ||
-      item.username?.includes(queryForm.name) ||
-      item.realName?.includes(queryForm.name)
+      String(item.username || '').includes(queryForm.name) ||
+      String(item.realName || '').includes(queryForm.name)
 
     const matchPhone =
       !queryForm.phone ||
-      item.phone?.includes(queryForm.phone)
+      String(item.phone || '').includes(queryForm.phone)
 
     const matchStatus =
       !queryForm.status ||
@@ -214,14 +220,22 @@ const filteredUsers = computed(() => {
   })
 })
 
+const pagedUsers = computed(() => {
+  const start = (pagination.currentPage - 1) * pagination.pageSize
+  const end = start + pagination.pageSize
+
+  return filteredUsers.value.slice(start, end)
+})
+
 const handleSearch = () => {
-  ElMessage.info('查询条件已更新，待后端接口接入后获取真实数据')
+  pagination.currentPage = 1
 }
 
 const handleReset = () => {
   queryForm.name = ''
   queryForm.phone = ''
   queryForm.status = ''
+  pagination.currentPage = 1
 }
 
 const handleView = (row) => {
@@ -229,12 +243,44 @@ const handleView = (row) => {
   detailVisible.value = true
 }
 
-const handleDisable = () => {
-  ElMessage.info('禁用用户功能待后端接口接入')
+const handleDisable = (row) => {
+  if (!row?.userId) {
+    ElMessage.warning('未找到对应用户信息')
+    return
+  }
+
+  ElMessage.info('请确认是否需要禁用该用户账号')
 }
 
-const handleEnable = () => {
-  ElMessage.info('启用用户功能待后端接口接入')
+const handleEnable = (row) => {
+  if (!row?.userId) {
+    ElMessage.warning('未找到对应用户信息')
+    return
+  }
+
+  ElMessage.info('请确认是否需要启用该用户账号')
+}
+
+const formatValue = (value) => {
+  if (value === undefined || value === null || value === '') {
+    return '-'
+  }
+
+  return value
+}
+
+const formatCount = (value, unit) => {
+  if (value === undefined || value === null || value === '') {
+    return '-'
+  }
+
+  return `${value} ${unit}`
+}
+
+const getStatusType = (status) => {
+  if (status === '正常') return 'success'
+  if (status === '禁用') return 'danger'
+  return 'info'
 }
 </script>
 
