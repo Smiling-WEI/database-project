@@ -9,11 +9,20 @@
       </el-button>
     </template>
 
+<el-alert
+  v-if="!canManageFlights"
+  title="当前岗位仅可查看航班详情，无权新增或修改航班"
+  type="info"
+  :closable="false"
+  show-icon
+  class="permission-alert"
+/>
     <div class="form-card">
       <el-form
         ref="formRef"
         :model="flightForm"
         :rules="rules"
+        :disabled="!canManageFlights"
         label-width="110px"
       >
         <el-row :gutter="20">
@@ -22,7 +31,7 @@
               <el-input
                 v-model="flightForm.flightNo"
                 placeholder="请输入航班号"
-                :disabled="isEdit"
+                :disabled="isEdit || !canManageFlights"
               />
             </el-form-item>
           </el-col>
@@ -35,7 +44,7 @@
                 placeholder="请选择航班日期"
                 value-format="YYYY-MM-DD"
                 style="width: 100%"
-                :disabled="isEdit"
+                :disabled="isEdit || !canManageFlights"
               />
             </el-form-item>
           </el-col>
@@ -93,6 +102,7 @@
           </el-button>
           <el-button
             type="primary"
+            :disabled="!canManageFlights"
             @click="handleSubmit"
           >
             保存
@@ -104,16 +114,31 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PageContainer from '../../../components/admin/PageContainer.vue'
+import api from '../../../api/index'
 
 const route = useRoute()
 const router = useRouter()
 const formRef = ref()
 
 const isEdit = computed(() => Boolean(route.query.instanceId))
+const currentUser = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem('currentUser') || '{}')
+  } catch (error) {
+    console.error('登录用户信息解析失败', error)
+    return {}
+  }
+})
+
+const canManageFlights = computed(() => {
+  return ['航司主管理员', '航班管理员'].includes(
+    currentUser.value.admin_role
+  )
+})
 
 const flightForm = reactive({
   flightNo: '',
@@ -145,22 +170,72 @@ const rules = {
   ]
 }
 
+const loadFlightDetail = async () => {
+  if (!isEdit.value) return
+
+  try {
+    const instanceId = route.query.instanceId
+    const response = await api.get(`/admin/flights/${instanceId}`)
+    const flight = response.data.data
+
+    flightForm.flightNo = flight.flightNo
+    flightForm.flightDate = flight.flightDate
+    flightForm.aircraftModel = flight.aircraftModel
+    flightForm.firstSeats = flight.firstSeats
+    flightForm.economySeats = flight.economySeats
+    flightForm.status = flight.status
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '航班详情加载失败')
+    console.error(error)
+  }
+}
+
 const goBack = () => {
   router.push('/admin/flights')
 }
 
 const handleSubmit = async () => {
+  if (!canManageFlights.value) {
+    ElMessage.warning('当前岗位无权新增或修改航班')
+    return
+  }
   if (!formRef.value) return
 
-  await formRef.value.validate((valid) => {
-    if (!valid) return
+  const valid = await formRef.value.validate().catch(() => false)
 
-    ElMessage.success(isEdit.value ? '航班信息已保存' : '航班已新增')
+  if (!valid) return
+
+  const payload = {
+    aircraft_model: flightForm.aircraftModel,
+    first_seats: flightForm.firstSeats,
+    economy_seats: flightForm.economySeats,
+    status: flightForm.status
+  }
+
+  try {
+    if (isEdit.value) {
+      await api.put(`/admin/flights/${route.query.instanceId}`, payload)
+      ElMessage.success('航班信息已保存')
+    } else {
+      await api.post('/admin/flights', {
+        flight_no: flightForm.flightNo,
+        flight_date: flightForm.flightDate,
+        ...payload
+      })
+      ElMessage.success('航班已新增')
+    }
+
     goBack()
-  })
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '航班保存失败')
+    console.error(error)
+  }
 }
-</script>
 
+onMounted(() => {
+  loadFlightDetail()
+})
+</script>
 <style scoped>
 .form-card {
   max-width: 980px;
@@ -180,5 +255,8 @@ const handleSubmit = async () => {
 
 :deep(.el-form-item) {
   margin-bottom: 20px;
+}
+.permission-alert {
+  margin-bottom: 18px;
 }
 </style>

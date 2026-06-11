@@ -167,8 +167,9 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import {
   Promotion,
   Tickets,
@@ -176,10 +177,11 @@ import {
   Setting,
   Plus,
   List
-} from '@element-plus/icons-vue';
-import PageContainer from '../../components/admin/PageContainer.vue';
+} from '@element-plus/icons-vue'
+import PageContainer from '../../components/admin/PageContainer.vue'
+import api from '../../api/index'
 
-const router = useRouter();
+const router = useRouter()
 
 const statCards = ref([
   {
@@ -202,7 +204,7 @@ const statCards = ref([
     value: null,
     icon: Setting
   }
-]);
+])
 
 const quickActions = [
   {
@@ -229,44 +231,66 @@ const quickActions = [
     path: '/admin/users',
     icon: User
   }
-];
+]
 
-const notices = ref([]);
+const notices = ref([])
+const todayFlights = ref([])
+const recentOrders = ref([])
 
-const todayFlights = ref([]);
-const recentOrders = ref([]);
+const loadDashboard = async () => {
+  try {
+    const response = await api.get('/admin/dashboard/summary')
+    const data = response.data.data
+
+    statCards.value[0].value = data.todayFlightCount
+    statCards.value[1].value = data.todayOrderCount
+    statCards.value[2].value = data.totalUserCount
+    statCards.value[3].value = data.adminCount
+
+    notices.value = data.notices || []
+    todayFlights.value = data.todayFlights || []
+    recentOrders.value = data.recentOrders || []
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '控制台数据加载失败')
+    console.error(error)
+  }
+}
 
 const formatStatValue = (value) => {
   if (value === null || value === undefined || value === '') {
-    return '--';
+    return '--'
   }
 
-  return value;
-};
+  return value
+}
 
 const goTo = (path) => {
-  router.push(path);
-};
+  router.push(path)
+}
 
 const getFlightStatusType = (status) => {
-  if (status === '正常') return 'success';
-  if (status === '延误') return 'warning';
-  if (status === '取消') return 'danger';
-  if (status === '已完成') return 'info';
+  if (status === '正常') return 'success'
+  if (status === '延误') return 'warning'
+  if (status === '取消') return 'danger'
+  if (status === '已完成') return 'info'
 
-  return 'info';
-};
+  return 'info'
+}
 
 const getOrderStatusType = (status) => {
-  if (status === '已支付') return 'success';
-  if (status === '待支付') return 'warning';
-  if (status === '已退票') return 'info';
-  if (status === '已取消') return 'info';
+  if (status === '已支付') return 'success'
+  if (status === '待支付') return 'warning'
+  if (status === '已退票') return 'info'
+  if (status === '已改签') return 'warning'
+  if (status === '已取消') return 'info'
 
-  return 'info';
-};
+  return 'info'
+}
+
+onMounted(() => {
+  loadDashboard()
+})
 </script>
-
 <style scoped>
 .stat-grid {
   display: grid;

@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from flask import Blueprint, g, request
 
 from db import get_db_connection
-from utils.auth import role_required
+from utils.auth import admin_role_required, role_required
 from utils.response import error_response, success_response
 
 
@@ -14,9 +14,8 @@ admin_pricing_bp = Blueprint(
     url_prefix="/api/admin",
 )
 
-
 @admin_pricing_bp.post("/flights/<int:instance_id>/cabins")
-@role_required("航空公司管理员")
+@admin_role_required("航司主管理员", "订单管理员")
 def create_cabin_pricing(instance_id):
     """为当前航司的指定航班新增一段时间内生效的舱位价格。"""
     data = request.get_json(silent=True) or {}
@@ -222,7 +221,7 @@ def list_cabin_pricing(instance_id):
         if connection is not None:
             connection.close()
 @admin_pricing_bp.put("/cabins/<int:pricing_id>")
-@role_required("航空公司管理员")
+@admin_role_required("航司主管理员", "订单管理员")
 def update_cabin_pricing(pricing_id):
     """修改当前航司已有的舱位价格记录。"""
     data = request.get_json(silent=True) or {}

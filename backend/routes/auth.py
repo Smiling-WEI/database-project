@@ -134,12 +134,14 @@ def login():
             cursor.execute(
                 """
                 SELECT
-                    user_id,
-                    username,
-                    password_hash,
-                    real_name,
-                    role,
-                    airline_id
+                 user_id,
+                 username,
+                 password_hash,
+                 real_name,
+                 role,
+                 airline_id,
+                 admin_role,
+                 status
                 FROM `user`
                 WHERE username = %s
                 LIMIT 1
@@ -152,6 +154,22 @@ def login():
         if user is None or user["password_hash"] != hash_password(password):
             return error_response("用户名或密码错误", 401)
 
+        if user["status"] != "正常":
+            return error_response("账号已被禁用，请联系管理员", 403)
+
+        if user["role"] == "航空公司管理员":
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE `user`
+                    SET last_login_at = NOW()
+                    WHERE user_id = %s
+                    """,
+                    (user["user_id"],),
+                )
+
+            connection.commit()
+
         token = generate_token(user)
 
         return success_response(
@@ -163,6 +181,7 @@ def login():
                     "real_name": user["real_name"],
                     "role": user["role"],
                     "airline_id": user["airline_id"],
+                    "admin_role": user["admin_role"],
                 },
             },
             "登录成功",
