@@ -213,8 +213,10 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../../components/admin/PageContainer.vue'
+import { ElMessage } from 'element-plus'
+import api from '../../../api/index'
 
 const queryForm = reactive({
   flightNo: '',
@@ -232,6 +234,21 @@ const detailVisible = ref(false)
 const currentOrder = ref(null)
 
 const orderList = ref([])
+
+const loadOrders = async () => {
+  try {
+    const response = await api.get('/admin/orders')
+
+    if (response.data.success) {
+      orderList.value = response.data.data || []
+    } else {
+      ElMessage.error(response.data.message || '订单数据加载失败')
+    }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '订单数据加载失败')
+    console.error(error)
+  }
+}
 
 const filteredOrders = computed(() => {
   return orderList.value.filter((item) => {
@@ -312,8 +329,11 @@ const getRecordType = (recordType) => {
   if (recordType === '历史订单') return 'info'
   return 'info'
 }
-</script>
 
+onMounted(() => {
+  loadOrders()
+})
+</script>
 <style scoped>
 .filter-card {
   margin-bottom: 18px;

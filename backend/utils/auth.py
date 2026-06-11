@@ -58,7 +58,7 @@ def login_required(view_function):
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT user_id, username, real_name, role, airline_id
+                    SELECT user_id, username, real_name, role, airline_id, admin_role, status
                     FROM `user`
                     WHERE user_id = %s
                     """,
@@ -69,7 +69,8 @@ def login_required(view_function):
 
             if user is None:
                 return error_response("用户不存在", 401)
-
+            if user["status"] != "正常":
+                return error_response("账号已被禁用，请联系管理员", 403)
             g.current_user = user
 
         finally:
@@ -87,6 +88,21 @@ def role_required(*allowed_roles):
         @login_required
         def wrapped_view(*args, **kwargs):
             if g.current_user["role"] not in allowed_roles:
+                return error_response("无权访问该接口", 403)
+
+            return view_function(*args, **kwargs)
+
+        return wrapped_view
+
+    return decorator
+def admin_role_required(*allowed_admin_roles):
+    """限制只有指定航司内部管理员角色可以访问接口。"""
+
+    def decorator(view_function):
+        @wraps(view_function)
+        @role_required("航空公司管理员")
+        def wrapped_view(*args, **kwargs):
+            if g.current_user.get("admin_role") not in allowed_admin_roles:
                 return error_response("无权访问该接口", 403)
 
             return view_function(*args, **kwargs)

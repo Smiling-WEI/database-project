@@ -10,6 +10,9 @@ from routes.admin_flight import admin_flight_bp
 from routes.admin_rule import admin_rule_bp
 from routes.admin_order import admin_order_bp
 from routes.admin_pricing import admin_pricing_bp
+from routes.admin_dashboard import admin_dashboard_bp
+from routes.admin_user import admin_user_bp
+from routes.admin_account import admin_account_bp
 from routes.change import change_bp
 from routes.flight_notice import flight_notice_bp
 
@@ -25,6 +28,9 @@ app.register_blueprint(admin_flight_bp)
 app.register_blueprint(admin_rule_bp)
 app.register_blueprint(admin_order_bp)
 app.register_blueprint(admin_pricing_bp)
+app.register_blueprint(admin_dashboard_bp)
+app.register_blueprint(admin_user_bp)
+app.register_blueprint(admin_account_bp)
 app.register_blueprint(change_bp)
 app.register_blueprint(flight_notice_bp)
 

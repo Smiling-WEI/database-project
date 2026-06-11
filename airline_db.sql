@@ -86,12 +86,17 @@ CREATE TABLE `user` (
     `real_name` VARCHAR(20) NOT NULL COMMENT '真实姓名',
     `id_card` CHAR(18) NOT NULL COMMENT '身份证号',
     `phone` VARCHAR(11) DEFAULT NULL COMMENT '联系电话',
+    `email` VARCHAR(100) DEFAULT NULL COMMENT '邮箱',
+    `status` VARCHAR(20) NOT NULL DEFAULT '正常' COMMENT '账号状态（正常、禁用）',
+    `admin_role` VARCHAR(30) DEFAULT NULL COMMENT '航司内部管理员角色（航司主管理员、航班管理员、订单管理员、客服管理员）',
+    `last_login_at` DATETIME DEFAULT NULL COMMENT '最近一次成功登录时间',
     `role` VARCHAR(30) NOT NULL COMMENT '角色（乘客、航空公司管理员、平台管理员）',
     `airline_id` INT DEFAULT NULL COMMENT '航空公司管理员所属航司（乘客与平台管理员为空）',
     `created_at` DATETIME NOT NULL COMMENT '注册时间',
     PRIMARY KEY (`user_id`),
     UNIQUE KEY `uk_username` (`username`),
     UNIQUE KEY `uk_id_card` (`id_card`),
+    UNIQUE KEY `uk_email` (`email`),
     FOREIGN KEY (`airline_id`) REFERENCES `airline_company`(`airline_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 

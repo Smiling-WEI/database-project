@@ -50,6 +50,14 @@
     </div>
 
     <!-- 表格区域 -->
+<el-alert
+  v-if="!canManageUsers"
+  title="当前岗位仅可查看用户信息，无权启用或禁用普通用户账号"
+  type="info"
+  :closable="false"
+  show-icon
+  class="permission-alert"
+/>
     <div class="table-card">
       <el-table
         :data="pagedUsers"
@@ -76,35 +84,37 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" fixed="right" width="200">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              @click="handleView(row)"
-            >
-              查看
-            </el-button>
+<el-table-column label="操作" fixed="right" width="200">
+  <template #default="{ row }">
+    <el-button
+      type="primary"
+      link
+      @click="handleView(row)"
+    >
+      查看
+    </el-button>
 
-            <el-button
-              v-if="row.status === '正常'"
-              type="danger"
-              link
-              @click="handleDisable(row)"
-            >
-              禁用
-            </el-button>
+    <el-button
+      v-if="row.status === '正常'"
+      type="danger"
+      link
+      :disabled="!canManageUsers"
+      @click="handleDisable(row)"
+    >
+      禁用
+    </el-button>
 
-            <el-button
-              v-else
-              type="success"
-              link
-              @click="handleEnable(row)"
-            >
-              启用
-            </el-button>
-          </template>
-        </el-table-column>
+    <el-button
+      v-else
+      type="success"
+      link
+      :disabled="!canManageUsers"
+      @click="handleEnable(row)"
+    >
+      启用
+    </el-button>
+  </template>
+</el-table-column>        
       </el-table>
 
       <div class="pagination-wrap">
@@ -181,9 +191,10 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import PageContainer from '../../../components/admin/PageContainer.vue'
+import api from '../../../api/index'
 
 const queryForm = reactive({
   name: '',
@@ -200,6 +211,35 @@ const detailVisible = ref(false)
 const currentUser = ref(null)
 
 const userList = ref([])
+const loginUser = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem('currentUser') || '{}')
+  } catch (error) {
+    console.error('登录用户信息解析失败', error)
+    return {}
+  }
+})
+
+const canManageUsers = computed(() => {
+  return ['航司主管理员', '客服管理员'].includes(
+    loginUser.value.admin_role
+  )
+})
+
+const loadUsers = async () => {
+  try {
+    const response = await api.get('/admin/users')
+
+    if (response.data.success) {
+      userList.value = response.data.data || []
+    } else {
+      ElMessage.error(response.data.message || '用户数据加载失败')
+    }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '用户数据加载失败')
+    console.error(error)
+  }
+}
 
 const filteredUsers = computed(() => {
   return userList.value.filter((item) => {
@@ -243,13 +283,41 @@ const handleView = (row) => {
   detailVisible.value = true
 }
 
+const updateUserStatus = async (row, status) => {
+  try {
+    await ElMessageBox.confirm(
+      `确认将用户“${row.username}”设置为“${status}”吗？`,
+      '账号状态确认',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: status === '禁用' ? 'warning' : 'info'
+      }
+    )
+
+    await api.put(`/admin/users/${row.userId}/status`, {
+      status
+    })
+
+    ElMessage.success(`账号已${status === '禁用' ? '禁用' : '启用'}`)
+    await loadUsers()
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') {
+      return
+    }
+
+    ElMessage.error(error.response?.data?.message || '账号状态修改失败')
+    console.error(error)
+  }
+}
+
 const handleDisable = (row) => {
   if (!row?.userId) {
     ElMessage.warning('未找到对应用户信息')
     return
   }
 
-  ElMessage.info('请确认是否需要禁用该用户账号')
+  updateUserStatus(row, '禁用')
 }
 
 const handleEnable = (row) => {
@@ -258,7 +326,7 @@ const handleEnable = (row) => {
     return
   }
 
-  ElMessage.info('请确认是否需要启用该用户账号')
+  updateUserStatus(row, '正常')
 }
 
 const formatValue = (value) => {
@@ -282,8 +350,11 @@ const getStatusType = (status) => {
   if (status === '禁用') return 'danger'
   return 'info'
 }
-</script>
 
+onMounted(() => {
+  loadUsers()
+})
+</script>
 <style scoped>
 .filter-card {
   margin-bottom: 18px;
@@ -349,5 +420,8 @@ const getStatusType = (status) => {
 
 :deep(.el-table .cell) {
   line-height: 1.4;
+}
+.permission-alert {
+  margin-bottom: 18px;
 }
 </style>

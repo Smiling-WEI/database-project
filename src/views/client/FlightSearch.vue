@@ -108,9 +108,16 @@ const onSubmit = async () => {
 
 // handleBook 保持不变...
 const handleBook = (flight) => {
+  sessionStorage.setItem(
+    'selectedFlight',
+    JSON.stringify({
+      ...flight,
+      flightDate: searchForm.date
+    })
+  )
+
   router.push('/book')
-}
-</script>
+}</script>
 
 <style scoped>
 /* 整个页面的外层容器 */

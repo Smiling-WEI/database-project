@@ -80,6 +80,7 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
+import api from '../api/index'
 
 const router = useRouter()
 const formRef = ref()
@@ -106,26 +107,56 @@ const rules = {
 const handleLogin = async () => {
   if (!formRef.value) return
 
-  await formRef.value.validate((valid) => {
-    if (!valid) return
+  const valid = await formRef.value.validate().catch(() => false)
 
-    loading.value = true
+  if (!valid) return
 
-    try {
-      if (loginForm.role === 'admin') {
-        router.push('/admin/dashboard')
-      } else {
-        router.push('/home')
-      }
-    } catch (error) {
-      ElMessage.error('登录失败，请稍后重试')
-    } finally {
-      loading.value = false
+  loading.value = true
+
+  try {
+    const response = await api.post('/login', {
+      username: loginForm.username,
+      password: loginForm.password
+    })
+
+    const result = response.data
+    const user = result.data?.user
+    const token = result.data?.token
+
+    if (!result.success || !user || !token) {
+      ElMessage.error(result.message || '登录失败')
+      return
     }
-  })
+
+    const isAdmin = user.role === '航空公司管理员'
+
+    if (loginForm.role === 'admin' && !isAdmin) {
+      ElMessage.error('该账号不是管理员账号')
+      return
+    }
+
+    if (loginForm.role === 'user' && isAdmin) {
+      ElMessage.error('该账号是管理员账号，请选择管理员入口')
+      return
+    }
+
+    localStorage.setItem('token', token)
+    localStorage.setItem('currentUser', JSON.stringify(user))
+
+    ElMessage.success('登录成功')
+
+    if (isAdmin) {
+      router.push('/admin/dashboard')
+    } else {
+      router.push('/home')
+    }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '登录失败，请检查账号和密码')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
-
 <style scoped>
 .login-wrapper {
   height: 100vh;

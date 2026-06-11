@@ -12,17 +12,25 @@
 
       <el-dropdown>
         <div class="admin-user">
-          <el-avatar :size="34">管</el-avatar>
+          <el-avatar :size="34">
+            {{ avatarText }}
+          </el-avatar>
+
           <div class="user-text">
-            <span class="name">管理员</span>
-            <span class="role">System Admin</span>
+            <span class="name">{{ displayName }}</span>
+            <span class="role">{{ displayRole }}</span>
           </div>
         </div>
 
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item @click="goDashboard">控制台</el-dropdown-item>
-            <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
+            <el-dropdown-item @click="goDashboard">
+              控制台
+            </el-dropdown-item>
+
+            <el-dropdown-item divided @click="logout">
+              退出登录
+            </el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -46,9 +54,41 @@ const titleMap = {
   '/admin/admins': '管理员管理'
 }
 
+const currentUser = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem('currentUser') || '{}')
+  } catch (error) {
+    console.error('登录用户信息解析失败', error)
+    return {}
+  }
+})
+
 const pageTitle = computed(() => {
-  if (route.path.startsWith('/admin/flights/edit')) return '航班编辑'
+  if (route.path.startsWith('/admin/flights/edit')) {
+    return '航班编辑'
+  }
+
   return titleMap[route.path] || '管理端'
+})
+
+const displayName = computed(() => {
+  return (
+    currentUser.value.real_name ||
+    currentUser.value.username ||
+    '管理员'
+  )
+})
+
+const displayRole = computed(() => {
+  return (
+    currentUser.value.admin_role ||
+    currentUser.value.role ||
+    '航空公司管理员'
+  )
+})
+
+const avatarText = computed(() => {
+  return String(displayName.value).slice(0, 1)
 })
 
 const goClientHome = () => {
@@ -60,6 +100,8 @@ const goDashboard = () => {
 }
 
 const logout = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('currentUser')
   router.push('/login')
 }
 </script>

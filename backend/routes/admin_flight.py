@@ -1,7 +1,7 @@
 from flask import Blueprint, g, request
 
 from db import get_db_connection
-from utils.auth import role_required
+from utils.auth import admin_role_required, role_required
 from utils.response import error_response, success_response
 from datetime import date
 
@@ -99,8 +99,79 @@ def list_managed_flights():
     finally:
         if connection is not None:
             connection.close()
-@admin_flight_bp.put("/flights/<int:instance_id>")
+@admin_flight_bp.get("/flights/<int:instance_id>")
 @role_required("航空公司管理员")
+def get_managed_flight_detail(instance_id):
+    """查询当前航司管理员有权限查看的单个航班实例。"""
+    connection = None
+
+    try:
+        connection = get_db_connection()
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    fi.instance_id,
+                    fi.flight_no,
+                    fi.flight_date,
+                    fi.aircraft_model,
+                    fi.first_seats,
+                    fi.economy_seats,
+                    fi.status,
+                    ac.airline_name,
+                    dep_airport.airport_name AS dep_airport,
+                    arr_airport.airport_name AS arr_airport
+                FROM flight_instance AS fi
+                JOIN flight_no_info AS fni
+                  ON fni.flight_no = fi.flight_no
+                JOIN airline_company AS ac
+                  ON ac.airline_id = fni.airline_id
+                JOIN route AS r
+                  ON r.route_id = fni.route_id
+                JOIN airport AS dep_airport
+                  ON dep_airport.airport_code = r.dep_airport_code
+                JOIN airport AS arr_airport
+                  ON arr_airport.airport_code = r.arr_airport_code
+                WHERE fi.instance_id = %s
+                  AND fni.airline_id = %s
+                LIMIT 1
+                """,
+                (
+                    instance_id,
+                    g.current_user["airline_id"],
+                ),
+            )
+
+            row = cursor.fetchone()
+
+        if row is None:
+            return error_response("未找到本航司的该航班", 404)
+
+        return success_response(
+            {
+                "instanceId": row["instance_id"],
+                "flightNo": row["flight_no"],
+                "flightDate": row["flight_date"].isoformat(),
+                "aircraftModel": row["aircraft_model"],
+                "firstSeats": row["first_seats"],
+                "economySeats": row["economy_seats"],
+                "status": row["status"],
+                "airlineName": row["airline_name"],
+                "depAirport": row["dep_airport"],
+                "arrAirport": row["arr_airport"],
+            },
+            "查询成功",
+        )
+
+    except Exception as error:
+        return error_response("航班详情查询失败", 500, error)
+
+    finally:
+        if connection is not None:
+            connection.close()
+@admin_flight_bp.put("/flights/<int:instance_id>")
+@admin_role_required("航司主管理员", "航班管理员")
 def update_managed_flight(instance_id):
     """修改当前航司所属的航班实例。"""
     data = request.get_json(silent=True) or {}
@@ -245,7 +316,7 @@ def update_managed_flight(instance_id):
         if connection is not None:
             connection.close()
 @admin_flight_bp.post("/flights/<int:instance_id>/irregularities")
-@role_required("航空公司管理员")
+@admin_role_required("航司主管理员", "航班管理员")
 def publish_flight_irregularity(instance_id):
     """发布本航司航班的延误、取消或航班调整通知。"""
     data = request.get_json(silent=True) or {}
@@ -453,7 +524,7 @@ def list_flight_irregularities(instance_id):
         if connection is not None:
             connection.close()
 @admin_flight_bp.put("/irregularities/<int:irregularity_id>/resolve")
-@role_required("航空公司管理员")
+@admin_role_required("航司主管理员", "航班管理员")
 def resolve_flight_irregularity(irregularity_id):
     """解除本航司发布的航班异常记录。"""
     connection = None
@@ -545,7 +616,7 @@ def resolve_flight_irregularity(irregularity_id):
         if connection is not None:
             connection.close()
 @admin_flight_bp.post("/flights")
-@role_required("航空公司管理员")
+@admin_role_required("航司主管理员", "航班管理员")
 def create_managed_flight():
     """为当前航司新增一个具体日期的航班实例。"""
     data = request.get_json(silent=True) or {}

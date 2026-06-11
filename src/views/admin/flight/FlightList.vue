@@ -4,7 +4,11 @@
     description="维护航班实例、执飞机型、座位数与运行状态"
   >
     <template #extra>
-      <el-button type="primary" @click="goAddFlight">
+ <el-button
+  type="primary"
+  :disabled="!canManageFlights"
+  @click="goAddFlight"
+>
         <el-icon><Plus /></el-icon>
         新增航班
       </el-button>
@@ -62,6 +66,14 @@
     </div>
 
     <!-- 表格区域 -->
+<el-alert
+  v-if="!canManageFlights"
+  title="当前岗位仅可查看航班信息，无权新增、编辑航班或发布航班异常"
+  type="info"
+  :closable="false"
+  show-icon
+  class="permission-alert"
+/>
     <div class="table-card">
       <el-table
         :data="pagedFlights"
@@ -89,25 +101,27 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" fixed="right" width="170">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              @click="goEditFlight(row)"
-            >
-              编辑
-            </el-button>
+<el-table-column label="操作" fixed="right" width="170">
+  <template #default="{ row }">
+    <el-button
+      type="primary"
+      link
+      :disabled="!canManageFlights"
+      @click="goEditFlight(row)"
+    >
+      编辑
+    </el-button>
 
-            <el-button
-              type="warning"
-              link
-              @click="handleIrregularity(row)"
-            >
-              发布异常
-            </el-button>
-          </template>
-        </el-table-column>
+    <el-button
+      type="warning"
+      link
+      :disabled="!canManageFlights"
+      @click="handleIrregularity(row)"
+    >
+      发布异常
+    </el-button>
+  </template>
+</el-table-column>        
       </el-table>
 
       <div class="pagination-wrap">
@@ -124,11 +138,12 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import PageContainer from '../../../components/admin/PageContainer.vue'
+import api from '../../../api/index'
 
 const router = useRouter()
 
@@ -144,6 +159,35 @@ const pagination = reactive({
 })
 
 const flightList = ref([])
+const currentUser = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem('currentUser') || '{}')
+  } catch (error) {
+    console.error('登录用户信息解析失败', error)
+    return {}
+  }
+})
+
+const canManageFlights = computed(() => {
+  return ['航司主管理员', '航班管理员'].includes(
+    currentUser.value.admin_role
+  )
+})
+
+const loadFlights = async () => {
+  try {
+    const response = await api.get('/admin/flights')
+
+    if (response.data.success) {
+      flightList.value = response.data.data || []
+    } else {
+      ElMessage.error(response.data.message || '航班数据加载失败')
+    }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '航班数据加载失败')
+    console.error(error)
+  }
+}
 
 const filteredFlights = computed(() => {
   return flightList.value.filter((item) => {
@@ -206,6 +250,10 @@ const getStatusType = (status) => {
   if (status === '已完成') return 'info'
   return 'info'
 }
+
+onMounted(() => {
+  loadFlights()
+})
 </script>
 
 <style scoped>
@@ -249,5 +297,8 @@ const getStatusType = (status) => {
 
 :deep(.el-table .cell) {
   line-height: 1.4;
+}
+.permission-alert {
+  margin-bottom: 18px;
 }
 </style>

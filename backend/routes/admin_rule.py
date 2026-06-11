@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import Blueprint, g, request
 
 from db import get_db_connection
-from utils.auth import role_required
+from utils.auth import admin_role_required, role_required
 from utils.response import error_response, success_response
 
 
@@ -105,7 +105,7 @@ def list_change_rules():
         if connection is not None:
             connection.close()
 @admin_rule_bp.post("/change-rules")
-@role_required("航空公司管理员")
+@admin_role_required("航司主管理员", "订单管理员")
 def create_change_rule():
     """为当前航司新增改签规则。"""
     data = request.get_json(silent=True) or {}
@@ -290,7 +290,7 @@ def create_change_rule():
         if connection is not None:
             connection.close()
 @admin_rule_bp.put("/change-rules/<int:rule_id>")
-@role_required("航空公司管理员")
+@admin_role_required("航司主管理员", "订单管理员")
 def update_change_rule(rule_id):
     """修改当前航司已有的改签规则。"""
     data = request.get_json(silent=True) or {}
