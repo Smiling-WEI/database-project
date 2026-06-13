@@ -1,0 +1,29 @@
+数据库更新说明：
+1、在 flight_instance 表中新增字段：
+dep_time DATETIME NOT NULL COMMENT '计划起飞时间'
+arr_time DATETIME NOT NULL COMMENT '计划到达时间'
+
+2、退票系统补全
+新增表：refund_rule（退票规则表）
+新增表：refund_record（退票记录表）
+
+3、管理员分类区别机制
+user表新增字段：
+admin_role
+airline_id
+last_login_at
+
+user表新增约束：
+role = 系统总管理员
+airline_id = NULL
+→ 拥有全局权限
+role = 航司管理员
+airline_id = 必填
+→ 只能操作所属航司数据
+
+4、订单与值机流程优化
+加入了值机状态以及值机时间，实现购票→值机→选座的流程
+check_in_status VARCHAR(20) DEFAULT '未值机'
+check_in_time DATETIME NULL
+
+5、删除了商务舱，仅保留头等舱和经济舱
