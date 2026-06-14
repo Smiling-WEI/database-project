@@ -128,7 +128,10 @@ const handleLogin = async () => {
       return
     }
 
-    const isAdmin = user.role === '航空公司管理员'
+    const isAdmin = [
+      '航空公司管理员',
+      '系统总管理员'
+    ].includes(user.role)
 
     if (loginForm.role === 'admin' && !isAdmin) {
       ElMessage.error('该账号不是管理员账号')
@@ -146,6 +149,7 @@ const handleLogin = async () => {
     ElMessage.success('登录成功')
 
     if (isAdmin) {
+      sessionStorage.setItem('adminSidebarCollapsed', 'false')
       router.push('/admin/dashboard')
     } else {
       router.push('/home')

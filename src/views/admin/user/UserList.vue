@@ -195,6 +195,10 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageContainer from '../../../components/admin/PageContainer.vue'
 import api from '../../../api/index'
+import {
+  canManageUsers as canEditUsers,
+  getStoredUser
+} from '../../../utils/adminAuth'
 
 const queryForm = reactive({
   name: '',
@@ -211,19 +215,10 @@ const detailVisible = ref(false)
 const currentUser = ref(null)
 
 const userList = ref([])
-const loginUser = computed(() => {
-  try {
-    return JSON.parse(localStorage.getItem('currentUser') || '{}')
-  } catch (error) {
-    console.error('登录用户信息解析失败', error)
-    return {}
-  }
-})
+const loginUser = computed(() => getStoredUser())
 
 const canManageUsers = computed(() => {
-  return ['航司主管理员', '客服管理员'].includes(
-    loginUser.value.admin_role
-  )
+  return canEditUsers(loginUser.value)
 })
 
 const loadUsers = async () => {

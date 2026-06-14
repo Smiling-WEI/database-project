@@ -119,25 +119,20 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import PageContainer from '../../../components/admin/PageContainer.vue'
 import api from '../../../api/index'
+import {
+  canManageFlights as canEditFlights,
+  getStoredUser
+} from '../../../utils/adminAuth'
 
 const route = useRoute()
 const router = useRouter()
 const formRef = ref()
 
 const isEdit = computed(() => Boolean(route.query.instanceId))
-const currentUser = computed(() => {
-  try {
-    return JSON.parse(localStorage.getItem('currentUser') || '{}')
-  } catch (error) {
-    console.error('登录用户信息解析失败', error)
-    return {}
-  }
-})
+const currentUser = computed(() => getStoredUser())
 
 const canManageFlights = computed(() => {
-  return ['航司主管理员', '航班管理员'].includes(
-    currentUser.value.admin_role
-  )
+  return canEditFlights(currentUser.value)
 })
 
 const flightForm = reactive({

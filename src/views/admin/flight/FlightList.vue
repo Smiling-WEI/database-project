@@ -14,6 +14,15 @@
       </el-button>
     </template>
 
+    <div v-if="systemAdmin" class="scope-card">
+      <el-form inline label-width="80px">
+        <AirlineScopeSelect
+          v-model="selectedAirlineId"
+          @change="loadFlights"
+        />
+      </el-form>
+    </div>
+
     <!-- 筛选区域 -->
     <div class="filter-card">
       <el-form
@@ -101,7 +110,7 @@
           </template>
         </el-table-column>
 
-<el-table-column label="操作" fixed="right" width="170">
+<el-table-column label="操作" fixed="right" width="220">
   <template #default="{ row }">
     <el-button
       type="primary"
@@ -113,12 +122,19 @@
     </el-button>
 
     <el-button
+      type="success"
+      link
+      @click="goPricing(row)"
+    >
+      票价
+    </el-button>
+
+    <el-button
       type="warning"
       link
-      :disabled="!canManageFlights"
-      @click="handleIrregularity(row)"
+      @click="goIrregularity(row)"
     >
-      发布异常
+      异常
     </el-button>
   </template>
 </el-table-column>        
@@ -143,7 +159,14 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import PageContainer from '../../../components/admin/PageContainer.vue'
-import api from '../../../api/index'
+import AirlineScopeSelect from '../../../components/admin/AirlineScopeSelect.vue'
+import { getAdminFlights } from '../../../api/admin/flight'
+import {
+  canManageFlights as canEditFlights,
+  getAirlineScopeParams,
+  getStoredUser,
+  isSystemAdmin
+} from '../../../utils/adminAuth'
 
 const router = useRouter()
 
@@ -159,24 +182,19 @@ const pagination = reactive({
 })
 
 const flightList = ref([])
-const currentUser = computed(() => {
-  try {
-    return JSON.parse(localStorage.getItem('currentUser') || '{}')
-  } catch (error) {
-    console.error('登录用户信息解析失败', error)
-    return {}
-  }
-})
+const selectedAirlineId = ref('')
+const currentUser = computed(() => getStoredUser())
+const systemAdmin = computed(() => isSystemAdmin(currentUser.value))
 
 const canManageFlights = computed(() => {
-  return ['航司主管理员', '航班管理员'].includes(
-    currentUser.value.admin_role
-  )
+  return canEditFlights(currentUser.value)
 })
 
 const loadFlights = async () => {
   try {
-    const response = await api.get('/admin/flights')
+    const response = await getAdminFlights(
+      getAirlineScopeParams(selectedAirlineId.value)
+    )
 
     if (response.data.success) {
       flightList.value = response.data.data || []
@@ -234,13 +252,27 @@ const goEditFlight = (row) => {
   })
 }
 
-const handleIrregularity = (row) => {
+const goPricing = (row) => {
   if (!row?.instanceId) {
     ElMessage.warning('未找到对应航班信息')
     return
   }
 
-  ElMessage.info('请在编辑页面维护该航班状态')
+  router.push({
+    path: '/admin/pricing',
+    query: {
+      instanceId: row.instanceId
+    }
+  })
+}
+
+const goIrregularity = (row) => {
+  if (!row?.instanceId) {
+    ElMessage.warning('未找到对应航班信息')
+    return
+  }
+
+  router.push(`/admin/flights/${row.instanceId}/irregularities`)
 }
 
 const getStatusType = (status) => {
@@ -262,6 +294,14 @@ onMounted(() => {
   padding: 18px 18px 0;
   border-radius: 16px;
   background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border: 1px solid #e2e8f0;
+}
+
+.scope-card {
+  margin-bottom: 18px;
+  padding: 18px 18px 0;
+  border-radius: 16px;
+  background: #f8fafc;
   border: 1px solid #e2e8f0;
 }
 

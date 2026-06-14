@@ -14,6 +14,15 @@
       </el-button>
     </template>
 
+    <div v-if="systemAdmin" class="scope-card">
+      <el-form inline label-width="80px">
+        <AirlineScopeSelect
+          v-model="selectedAirlineId"
+          @change="loadAdmins"
+        />
+      </el-form>
+    </div>
+
     <div class="filter-card">
       <el-form :model="queryForm" inline label-width="80px">
         <el-form-item label="管理员名">
@@ -79,6 +88,12 @@
         empty-text="暂无管理员数据"
       >
         <el-table-column prop="adminId" label="账号ID" width="90" />
+        <el-table-column
+          v-if="systemAdmin"
+          prop="airlineName"
+          label="航空公司"
+          min-width="145"
+        />
         <el-table-column prop="name" label="管理员名" width="150" show-overflow-tooltip />
         <el-table-column prop="account" label="登录账号" width="170" show-overflow-tooltip />
         <el-table-column prop="phone" label="手机号" width="135" />
@@ -263,7 +278,14 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import PageContainer from '../../../components/admin/PageContainer.vue'
+import AirlineScopeSelect from '../../../components/admin/AirlineScopeSelect.vue'
 import api from '../../../api/index'
+import {
+  canManageAdmins as canEditAdmins,
+  getAirlineScopeParams,
+  getStoredUser,
+  isSystemAdmin
+} from '../../../utils/adminAuth'
 
 const queryForm = reactive({
   name: '',
@@ -281,17 +303,12 @@ const isEdit = ref(false)
 const editingAdminId = ref(null)
 const formRef = ref()
 const adminList = ref([])
-const currentUser = computed(() => {
-  try {
-    return JSON.parse(localStorage.getItem('currentUser') || '{}')
-  } catch (error) {
-    console.error('登录用户信息解析失败', error)
-    return {}
-  }
-})
+const selectedAirlineId = ref('')
+const currentUser = computed(() => getStoredUser())
+const systemAdmin = computed(() => isSystemAdmin(currentUser.value))
 
 const canManageAdmins = computed(() => {
-  return currentUser.value.admin_role === '航司主管理员'
+  return canEditAdmins(currentUser.value)
 })
 
 const adminForm = reactive({
@@ -302,7 +319,8 @@ const adminForm = reactive({
   email: '',
   role: '',
   status: '正常',
-  password: ''
+  password: '',
+  airlineId: ''
 })
 
 const rules = {
@@ -337,7 +355,9 @@ const rules = {
 
 const loadAdmins = async () => {
   try {
-    const response = await api.get('/admin/admins')
+    const response = await api.get('/admin/admins', {
+      params: getAirlineScopeParams(selectedAirlineId.value)
+    })
 
     if (response.data.success) {
       adminList.value = response.data.data || []
@@ -385,6 +405,7 @@ const resetForm = () => {
   adminForm.role = ''
   adminForm.status = '正常'
   adminForm.password = ''
+  adminForm.airlineId = ''
   editingAdminId.value = null
 }
 
@@ -400,8 +421,13 @@ const handleReset = () => {
 }
 
 const handleAdd = () => {
+  if (systemAdmin.value && !selectedAirlineId.value) {
+    ElMessage.warning('请先选择需要新增管理员的航空公司')
+    return
+  }
   isEdit.value = false
   resetForm()
+  adminForm.airlineId = selectedAirlineId.value
   dialogVisible.value = true
 }
 
@@ -416,6 +442,7 @@ const handleEdit = (row) => {
   adminForm.role = row.role || ''
   adminForm.status = row.status || '正常'
   adminForm.password = ''
+  adminForm.airlineId = row.airlineId || selectedAirlineId.value
   dialogVisible.value = true
 }
 
@@ -432,7 +459,8 @@ const handleSubmit = async () => {
       phone: adminForm.phone,
       email: adminForm.email,
       role: adminForm.role,
-      status: adminForm.status
+      status: adminForm.status,
+      ...getAirlineScopeParams(adminForm.airlineId)
     }
 
     if (isEdit.value) {
@@ -556,6 +584,14 @@ onMounted(() => {
   padding: 18px 18px 0;
   border-radius: 16px;
   background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border: 1px solid #e2e8f0;
+}
+
+.scope-card {
+  margin-bottom: 18px;
+  padding: 18px 18px 0;
+  border-radius: 16px;
+  background: #f8fafc;
   border: 1px solid #e2e8f0;
 }
 

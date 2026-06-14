@@ -1,9 +1,12 @@
 <template>
   <div class="admin-layout">
-    <AppSidebar />
+    <AppSidebar :collapsed="sidebarCollapsed" />
 
     <div class="admin-main">
-      <AppHeader />
+      <AppHeader
+        :sidebar-collapsed="sidebarCollapsed"
+        @toggle-sidebar="toggleSidebar"
+      />
 
       <main class="admin-content">
         <router-view />
@@ -13,8 +16,21 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import AppSidebar from '../components/admin/AppSidebar.vue'
 import AppHeader from '../components/admin/AppHeader.vue'
+
+const sidebarCollapsed = ref(
+  sessionStorage.getItem('adminSidebarCollapsed') === 'true'
+)
+
+const toggleSidebar = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  sessionStorage.setItem(
+    'adminSidebarCollapsed',
+    String(sidebarCollapsed.value)
+  )
+}
 </script>
 
 <style scoped>

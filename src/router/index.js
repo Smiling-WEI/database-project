@@ -20,9 +20,14 @@ import Mine from '../views/client/Mine.vue'
 import Dashboard from '../views/admin/Dashboard.vue'
 import FlightList from '../views/admin/flight/FlightList.vue'
 import FlightEdit from '../views/admin/flight/FlightEdit.vue'
+import FlightIrregularity from '../views/admin/flight/FlightIrregularity.vue'
 import UserList from '../views/admin/user/UserList.vue'
 import OrderList from '../views/admin/order/OrderList.vue'
 import AdminList from '../views/admin/adminAccount/AdminList.vue'
+import CabinPricing from '../views/admin/pricing/CabinPricing.vue'
+import ChangeRuleList from '../views/admin/rule/ChangeRuleList.vue'
+import AdminProfile from '../views/admin/Profile.vue'
+import CrossAirlineCoordination from '../views/admin/coordination/CrossAirlineCoordination.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -58,9 +63,21 @@ const router = createRouter({
         { path: 'dashboard', component: Dashboard },
         { path: 'flights', component: FlightList },
         { path: 'flights/edit', component: FlightEdit },
+        {
+          path: 'flights/:instanceId/irregularities',
+          component: FlightIrregularity
+        },
+        { path: 'pricing', component: CabinPricing },
+        { path: 'change-rules', component: ChangeRuleList },
+        {
+          path: 'change-records',
+          redirect: '/admin/orders?tab=change'
+        },
         { path: 'users', component: UserList },
         { path: 'orders', component: OrderList },
-        { path: 'admins', component: AdminList }
+        { path: 'admins', component: AdminList },
+        { path: 'coordination', component: CrossAirlineCoordination },
+        { path: 'profile', component: AdminProfile }
       ]
     }
   ]
