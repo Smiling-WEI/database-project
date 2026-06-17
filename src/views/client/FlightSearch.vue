@@ -1,173 +1,639 @@
 <template>
-  <div class="search-container">
-    
-    <div class="hero-section">
-      <h1 style="margin: 0; font-size: 32px; letter-spacing: 2px;">
-        <el-icon><Promotion /></el-icon> 探索您的云端之旅
-      </h1>
-      <p style="opacity: 0.8; margin-top: 10px;">高效并发 · 安全票务</p>
+  <div class="page-container">
+    <div class="white-card">
+      <div class="card-title">
+        <div class="blue-line"></div>
+        <span>航班查询</span>
+      </div>
+
+      <div class="search-form-row">
+        <div class="form-item">
+          <span class="label">出发城市</span>
+          <el-select
+            v-model="searchForm.departure"
+            placeholder="请选择城市"
+            size="large"
+            class="city-select"
+          >
+            <el-option
+              v-for="city in cityOptions"
+              :key="city"
+              :label="city"
+              :value="city"
+            />
+          </el-select>
+        </div>
+
+        <el-tooltip content="交换出发和到达城市" placement="top">
+          <el-button class="exchange-btn" circle @click="swapCity">
+            <el-icon><Switch /></el-icon>
+          </el-button>
+        </el-tooltip>
+
+        <div class="form-item">
+          <span class="label">到达城市</span>
+          <el-select
+            v-model="searchForm.arrival"
+            placeholder="请选择城市"
+            size="large"
+            class="city-select"
+          >
+            <el-option
+              v-for="city in cityOptions"
+              :key="city"
+              :label="city"
+              :value="city"
+            />
+          </el-select>
+        </div>
+
+        <div class="form-item">
+          <span class="label">出发日期</span>
+          <el-date-picker
+            v-model="searchForm.date"
+            type="date"
+            placeholder="选择日期"
+            size="large"
+            class="date-picker"
+            value-format="YYYY-MM-DD"
+            :disabled-date="disablePastDate"
+          />
+        </div>
+
+        <div class="form-item btn-item">
+          <el-button
+            type="primary"
+            size="large"
+            class="search-btn"
+            :loading="searching"
+            @click="handleSearch"
+          >
+            <el-icon><Search /></el-icon>
+            查询航班
+          </el-button>
+        </div>
+      </div>
+
+      <div v-if="historyList.length > 0" class="search-history">
+        <span class="history-label">最近查询：</span>
+        <button
+          v-for="item in historyList"
+          :key="item"
+          type="button"
+          class="history-item"
+          @click="useHistory(item)"
+        >
+          {{ item.departure }} - {{ item.arrival }}
+        </button>
+        <button type="button" class="clear-history" @click="clearHistory">
+          <el-icon><Delete /></el-icon>
+          清除历史
+        </button>
+      </div>
     </div>
-    <el-form :inline="true" :model="searchForm" class="search-form">
-      <el-form-item label="出发地">
-        <el-input v-model="searchForm.departure" placeholder="例如：北京" />
-      </el-form-item>
-      <el-form-item label="目的地">
-        <el-input v-model="searchForm.arrival" placeholder="例如：上海" />
-      </el-form-item>
-      <el-form-item label="出发日期">
-        <el-date-picker v-model="searchForm.date" type="date" placeholder="选择日期" value-format="YYYY-MM-DD" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="onSubmit">查询航班</el-button>
-      </el-form-item>
-    </el-form>
 
-    <div class="table-container" v-if="flightList.length > 0">
-      <el-table :data="flightList" style="width: 100%" stripe border>
-        
-        <el-table-column prop="flightNo" label="航班号" width="120" />
-        
-        <el-table-column label="起降机场" width="200">
-          <template #default="scope">
-            {{ scope.row.depAirport }} ✈️ {{ scope.row.arrAirport }}
+    <div v-if="hasSearched" class="white-card result-card">
+      <div class="result-header">
+        <div class="result-info">
+          <strong>查询结果：</strong>
+          {{ searchForm.departure }}
+          <el-icon><Right /></el-icon>
+          {{ searchForm.arrival }}
+          <span class="date-text">{{ searchForm.date }}</span>
+          <span class="count-text">共 {{ tableData.length }} 个航班</span>
+        </div>
+      </div>
+
+      <el-empty
+        v-if="tableData.length === 0"
+        description="暂无符合条件的航班"
+      />
+
+      <el-table
+        v-else
+        :data="tableData"
+        style="width: 100%"
+        row-class-name="custom-row"
+      >
+        <el-table-column prop="flightNo" label="航班号" width="100" />
+
+        <el-table-column prop="airline" label="航空公司" min-width="160">
+          <template #default="{ row }">
+            <div class="airline-cell">
+              <span class="airline-dot" :class="row.airlineCode"></span>
+              {{ row.airline }}
+            </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="起降时间" width="150">
-          <template #default="scope">
-            {{ scope.row.depTime }} - {{ scope.row.arrTime }}
+        <el-table-column prop="depAirport" label="出发机场" min-width="160" />
+        <el-table-column prop="arrAirport" label="到达机场" min-width="160" />
+
+        <el-table-column prop="depTime" label="起飞时间" align="center" width="100">
+          <template #default="{ row }">
+            <span class="time-text">{{ row.depTime }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="price" label="经济舱价格(元)" width="150" />
-        
-        <el-table-column label="余票状态" width="120">
-          <template #default="scope">
-            <el-tag :type="scope.row.seats > 10 ? 'success' : (scope.row.seats > 0 ? 'warning' : 'danger')">
-              {{ scope.row.seats > 0 ? `余票: ${scope.row.seats}` : '已售罄' }}
-            </el-tag>
+        <el-table-column prop="arrTime" label="到达时间" align="center" width="100">
+          <template #default="{ row }">
+            <span class="time-text">{{ row.arrTime }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="120">
-          <template #default="scope">
-            <el-button 
-              type="primary" 
-              size="small" 
-              :disabled="scope.row.seats === 0" 
-              @click="handleBook(scope.row)"
-            >
-              预订
-            </el-button>
+        <el-table-column label="舱位" align="center" width="120">
+          <template #default="{ row }">
+            <div class="sub-cell-wrapper">
+              <div v-if="row.cabins.length === 0" class="sub-cell-row muted-text">
+                暂无可售舱位
+              </div>
+              <template v-else>
+                <div
+                  v-for="cabin in row.cabins"
+                  :key="cabin.cabinName"
+                  class="sub-cell-row"
+                >
+                  {{ cabin.cabinName }}
+                </div>
+              </template>
+            </div>
           </template>
         </el-table-column>
 
+        <el-table-column label="价格" align="center" width="120">
+          <template #default="{ row }">
+            <div class="sub-cell-wrapper">
+              <div v-if="row.cabins.length === 0" class="sub-cell-row muted-text">
+                -
+              </div>
+              <template v-else>
+                <div
+                  v-for="cabin in row.cabins"
+                  :key="cabin.cabinName"
+                  class="sub-cell-row"
+                >
+                  <span v-if="cabin.price !== null" class="price-text">¥{{ cabin.price }}</span>
+                  <span v-else class="muted-text">待定</span>
+                </div>
+              </template>
+            </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="剩余票数" align="center" width="120">
+          <template #default="{ row }">
+            <div class="sub-cell-wrapper">
+              <div v-if="row.cabins.length === 0" class="sub-cell-row muted-text">
+                -
+              </div>
+              <template v-else>
+                <div
+                  v-for="cabin in row.cabins"
+                  :key="cabin.cabinName"
+                  class="sub-cell-row"
+                >
+                  <span :class="['seat-text', cabin.seats === 0 ? 'sold-out-text' : '']">
+                    {{ cabin.seats > 0 ? `剩余 ${cabin.seats} 张` : '无余票' }}
+                  </span>
+                </div>
+              </template>
+            </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="操作" align="center" width="120">
+          <template #default="{ row }">
+            <div class="sub-cell-wrapper">
+              <div v-if="row.cabins.length === 0" class="sub-cell-row">
+                <el-button type="primary" size="small" class="buy-btn" disabled>
+                  购买
+                </el-button>
+              </div>
+              <template v-else>
+                <div
+                  v-for="cabin in row.cabins"
+                  :key="cabin.cabinName"
+                  class="sub-cell-row"
+                >
+                  <el-button
+                    type="primary"
+                    size="small"
+                    class="buy-btn"
+                    :disabled="cabin.seats === 0 || !cabin.pricingId"
+                    @click="goToBooking(row, cabin)"
+                  >
+                    购买
+                  </el-button>
+                </div>
+              </template>
+            </div>
+          </template>
+        </el-table-column>
       </el-table>
+
+      <div v-if="tableData.length > 0" class="pagination-wrapper">
+        <el-pagination
+          background
+          layout="total, prev, pager, next"
+          :page-size="10"
+          :total="tableData.length"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-// 1. 引入我们刚刚配好的 api
-import api from '../../api/index'
-// 2. 引入 Element Plus 的消息提示工具
 import { ElMessage } from 'element-plus'
+import { Switch, Search, Delete, Right } from '@element-plus/icons-vue'
+import { getFlightCabins, searchFlights } from '../../api/client/flight'
 
 const router = useRouter()
-const searchForm = reactive({ departure: '北京', arrival: '上海', date: '' })
-const flightList = ref([])
 
-// 3. 将 onSubmit 改造为异步函数 (async/await)
-const onSubmit = async () => {
-  console.log('准备向后端发送请求，条件是：', searchForm)
-  
-  try {
-    // 解析每一行：
-    // await 会让代码在这里耐心等待，直到后端把数据传回来
-    // api.get 表示发送一个 GET 请求给后端，路径是 /flights/search
-    // { params: searchForm } 会自动把你的搜索条件拼接到网址后面送给后端
-    const response = await api.get('/flights/search', { params: searchForm })
+const cityOptions = ['北京', '上海', '成都', '广州', '深圳']
 
-    // 假设 2 号同学按约定返回的格式是 { code: 200, message: "成功", data: [...] }
-    if (response.data.code === 200) {
-      // 把后端传回来的真实数组，赋值给页面的表格
-      flightList.value = response.data.data
-      ElMessage.success('查询成功！')
-    } else {
-      // 如果后端查不到数据或报错，把后端的错误信息弹窗提示给用户
-      ElMessage.warning(response.data.message || '未查询到相关航班')
-    }
-  } catch (error) {
-    // 捕获网络异常（比如后端代码崩了，或者服务器没开）
-    ElMessage.error('网络请求失败，请检查后端服务是否启动')
-    console.error(error)
+const getTodayText = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+const searchForm = ref({
+  departure: '北京',
+  arrival: '上海',
+  date: getTodayText()
+})
+
+const searching = ref(false)
+const hasSearched = ref(false)
+const tableData = ref([])
+const historyList = ref([])
+
+const disablePastDate = (date) => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return date < today
+}
+
+const formatTime = (value) => {
+  if (!value) return '--:--'
+
+  const text = String(value)
+  const match = text.match(/(\d{2}):(\d{2})/)
+
+  return match ? `${match[1]}:${match[2]}` : text
+}
+
+const normalizeCabin = (cabin) => {
+  const seats = Number(cabin.remainingSeats ?? cabin.seats ?? 0)
+  const price = cabin.price ?? cabin.salePrice
+
+  return {
+    pricingId: cabin.pricingId ?? null,
+    cabinName: cabin.cabinName || cabin.cabinType || '',
+    price: price === null || price === undefined ? null : Number(price),
+    seats: Number.isNaN(seats) ? 0 : seats
   }
 }
 
-// handleBook 保持不变...
-const handleBook = (flight) => {
-  sessionStorage.setItem(
-    'selectedFlight',
-    JSON.stringify({
-      ...flight,
-      flightDate: searchForm.date
-    })
-  )
+const normalizeFlight = (flight, cabins = []) => {
+  const flightNo = flight.flightNo || ''
 
-  router.push('/book')
-}</script>
+  return {
+    instanceId: flight.instanceId,
+    flightNo,
+    airlineCode: flight.airlineCode || '',
+    airline: flight.airline || flight.airlineName || '-',
+    depAirport: flight.depAirport || '-',
+    arrAirport: flight.arrAirport || '-',
+    depTime: formatTime(flight.depTime),
+    arrTime: formatTime(flight.arrTime),
+    cabins: cabins.map(normalizeCabin).filter(cabin => cabin.cabinName)
+  }
+}
+
+const swapCity = () => {
+  const temp = searchForm.value.departure
+  searchForm.value.departure = searchForm.value.arrival
+  searchForm.value.arrival = temp
+}
+
+const clearHistory = () => {
+  historyList.value = []
+}
+
+const useHistory = (item) => {
+  searchForm.value.departure = item.departure
+  searchForm.value.arrival = item.arrival
+}
+
+const addHistory = () => {
+  const newHistory = {
+    departure: searchForm.value.departure,
+    arrival: searchForm.value.arrival
+  }
+
+  historyList.value = [
+    newHistory,
+    ...historyList.value.filter(
+      item =>
+        item.departure !== newHistory.departure ||
+        item.arrival !== newHistory.arrival
+    )
+  ].slice(0, 5)
+}
+
+const handleSearch = async () => {
+  if (!searchForm.value.departure || !searchForm.value.arrival || !searchForm.value.date) {
+    ElMessage.warning('请先完整选择出发城市、到达城市和出发日期')
+    return
+  }
+
+  if (searchForm.value.departure === searchForm.value.arrival) {
+    ElMessage.warning('出发城市和到达城市不能相同')
+    return
+  }
+
+  searching.value = true
+  hasSearched.value = true
+
+  try {
+    const response = await searchFlights({
+      departure: searchForm.value.departure,
+      arrival: searchForm.value.arrival,
+      date: searchForm.value.date
+    })
+
+    const flights = response.data.data || []
+
+    tableData.value = await Promise.all(
+      flights.map(async flight => {
+        if (!flight.instanceId) {
+          return normalizeFlight(flight)
+        }
+
+        try {
+          const cabinResponse = await getFlightCabins(flight.instanceId)
+          return normalizeFlight(flight, cabinResponse.data.data || [])
+        } catch (error) {
+          console.error(error)
+          return normalizeFlight(flight)
+        }
+      })
+    )
+
+    addHistory()
+  } catch (error) {
+    tableData.value = []
+    ElMessage.error(error.response?.data?.message || '航班查询失败，请稍后重试')
+    console.error(error)
+  } finally {
+    searching.value = false
+  }
+}
+
+const goToBooking = (flight, cabin) => {
+  router.push({
+    path: '/book',
+    query: {
+      instanceId: flight.instanceId,
+      flightNo: flight.flightNo,
+      airline: flight.airline,
+      airlineCode: flight.airlineCode,
+      pricingId: cabin.pricingId,
+      cabinName: cabin.cabinName,
+      price: cabin.price,
+      depAirport: flight.depAirport,
+      arrAirport: flight.arrAirport,
+      depTime: flight.depTime,
+      arrTime: flight.arrTime,
+      date: searchForm.value.date
+    }
+  })
+}
+</script>
 
 <style scoped>
-/* 整个页面的外层容器 */
-.search-container {
+.page-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding-bottom: 50px;
+  gap: 20px;
 }
 
-/* 顶部巨大的欢迎横幅区域 */
-.hero-section {
-  width: 100%;
-  height: 200px;
-  background: linear-gradient(120deg, #005a9e, #0081c6); /* 航空蓝渐变 */
-  color: white;
-  text-align: center;
-  padding-top: 40px;
-  margin-bottom: -60px; /* 故意设置负边距，让搜索卡片能“压”在这个蓝色背景上 */
+.white-card {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 24px 32px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
 }
 
-/* 重构搜索表单，把它变成一个悬浮的卡片 */
-.search-form {
-  background: white;
-  padding: 30px 40px;
-  border-radius: 12px; /* 圆角变得更大更柔和 */
-  /* 给搜索卡片加上非常立体的弥散阴影 */
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+.card-title {
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 15px; /* 让输入框之间的间距更自然 */
-  z-index: 10; /* 保证卡片浮在蓝色横幅之上 */
-  width: 80%;
-  max-width: 900px;
+  font-size: 18px;
+  font-weight: bold;
+  color: #1e293b;
+  margin-bottom: 24px;
 }
 
-/* 去除表单项自带的底部间距，让表单在卡片里更紧凑 */
-.search-form .el-form-item {
-  margin-bottom: 0;
+.blue-line {
+  width: 4px;
+  height: 18px;
+  background-color: #1890ff;
+  border-radius: 2px;
+  margin-right: 10px;
 }
 
-/* 美化航班列表展示区 */
-.table-container {
-  width: 85%;
-  max-width: 1000px;
-  margin-top: 40px;
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05); /* 淡淡的底座阴影 */
+.search-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 24px;
+  width: 100%;
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.label {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.city-select,
+.date-picker {
+  width: 180px;
+}
+
+.exchange-btn {
+  margin-bottom: 1px;
+  color: #64748b;
+}
+
+.exchange-btn:hover {
+  color: #1890ff;
+  border-color: #1890ff;
+}
+
+.btn-item {
+  margin-left: auto;
+}
+
+.search-btn {
+  width: 140px;
+  font-weight: bold;
+  background-color: #1890ff;
+}
+
+.search-history {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 13px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-label {
+  color: #94a3b8;
+}
+
+.history-item,
+.clear-history {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.history-item {
+  color: #475569;
+}
+
+.history-item:hover {
+  color: #1890ff;
+}
+
+.clear-history {
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.clear-history:hover {
+  color: #ef4444;
+}
+
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.result-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.date-text,
+.count-text {
+  color: #64748b;
+  margin-left: 8px;
+}
+
+:deep(.el-table .el-table__cell) {
+  padding: 0 !important;
+}
+
+.sub-cell-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.sub-cell-row {
+  min-height: 55px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid #f1f5f9;
+  padding: 8px 0;
+  box-sizing: border-box;
+}
+
+.sub-cell-row:last-child {
+  border-bottom: none;
+}
+
+.airline-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  padding-left: 12px;
+}
+
+.airline-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.CA {
+  background-color: #e11d48;
+}
+
+.MU {
+  background-color: #0284c7;
+}
+
+.time-text {
+  font-size: 15px;
+  font-weight: bold;
+  color: #1e293b;
+}
+
+.price-text {
+  font-size: 16px;
+  font-weight: bold;
+  color: #ef4444;
+}
+
+.seat-text {
+  font-size: 13px;
+  color: #475569;
+}
+
+.sold-out-text {
+  color: #94a3b8;
+  font-weight: normal;
+}
+
+.buy-btn {
+  border-radius: 4px;
+  font-weight: bold;
+  width: 72px;
+}
+
+.pagination-wrapper {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

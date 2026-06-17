@@ -1,3 +1,6 @@
+
+SET FOREIGN_KEY_CHECKS = 0;
+
 CREATE DATABASE IF NOT EXISTS `airline_database_improved` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE `airline_database_improved`;
 
@@ -406,3 +409,6 @@ CREATE TABLE refund_record (
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COMMENT='退票记录表';
+
+
+SET FOREIGN_KEY_CHECKS = 1;

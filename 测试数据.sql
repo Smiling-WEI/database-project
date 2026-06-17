@@ -14,10 +14,11 @@ INSERT INTO `route` (`route_id`, `dep_airport_code`, `arr_airport_code`, `stop_a
 (1, 'PEK', 'SHA', NULL), 
 (2, 'TFU', 'PEK', NULL); 
 
+-- 【修复1】：将 '航空公司管理员' 统一修改为符合 ENUM 规范的 '航司管理员'
 INSERT INTO `user` (`user_id`, `username`, `password_hash`, `real_name`, `id_card`, `phone`, `role`, `airline_id`, `created_at`) VALUES 
 (1, 'passenger_zhang', 'pwd_hash_1', '张三', '110101199001011234', '13800138000', '乘客', NULL, NOW()),
-(2, 'air_ca_admin', 'pwd_hash_2', '国航管理员', '110101198505054321', '13900001111', '航空公司管理员', 1, NOW()),
-(3, 'air_mu_admin', 'pwd_hash_3', '东航管理员', '310101198808085678', '13900002222', '航空公司管理员', 2, NOW());
+(2, 'air_ca_admin', 'pwd_hash_2', '国航管理员', '110101198505054321', '13900001111', '航司管理员', 1, NOW()),
+(3, 'air_mu_admin', 'pwd_hash_3', '东航管理员', '310101198808085678', '13900002222', '航司管理员', 2, NOW());
 
 INSERT INTO `passenger` (`passenger_id`, `real_name`, `id_card`, `phone`) VALUES 
 (1, '张三', '110101199001011234', '13800138000');
@@ -34,9 +35,10 @@ INSERT INTO `flight_no_info` (`flight_no`, `route_id`, `airline_id`) VALUES
 ('CA1831', 1, 1), 
 ('MU5101', 1, 2); 
 
-INSERT INTO `flight_instance` (`instance_id`, `flight_no`, `flight_date`, `aircraft_model`, `first_seats`, `economy_seats`, `status`) VALUES 
-(1001, 'CA1831', '2026-06-15', '波音777', 10, 150, '正常'),
-(1002, 'MU5101', '2026-06-15', '空客A320', 8, 120, '正常');
+-- 【修复2】：补充了缺失的 dep_time 和 arr_time 字段及对应的数据
+INSERT INTO `flight_instance` (`instance_id`, `flight_no`, `flight_date`, `dep_time`, `arr_time`, `aircraft_model`, `first_seats`, `economy_seats`, `status`) VALUES 
+(1001, 'CA1831', '2026-06-15', '2026-06-15 08:30:00', '2026-06-15 10:45:00', '波音777', 10, 150, '正常'),
+(1002, 'MU5101', '2026-06-15', '2026-06-15 14:00:00', '2026-06-15 16:15:00', '空客A320', 8, 120, '正常');
 
 INSERT INTO `cabin_pricing` (`pricing_id`, `instance_id`, `cabin_type`, `sale_price`, `valid_from`, `valid_to`) VALUES 
 (2001, 1001, '经济舱', 1200.00, NOW(), '2026-06-15 12:00:00'),

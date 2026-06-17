@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { getToken, getRole } from '../utils/auth'
 
 // 1. 公共页面：退一层去 views 根目录找
 import Login from '../views/Login.vue'
@@ -13,8 +14,13 @@ import AdminLayout from '../layouts/AdminLayout.vue'
 import FlightSearch from '../views/client/FlightSearch.vue'
 import BookingConfirm from '../views/client/BookingConfirm.vue'
 import MyOrders from '../views/client/MyOrders.vue'
+import OrderDetail from '../views/client/OrderDetail.vue'
 import PassengerManage from '../views/client/PassengerManage.vue'
 import Mine from '../views/client/Mine.vue'
+import Checkin from '../views/client/Checkin.vue'
+import ChangeTicket from '../views/client/ChangeTicket.vue'
+import ChangeRecords from '../views/client/ChangeRecords.vue'
+import ChangePassword from '../views/client/ChangePassword.vue'
 
 // 4. 管理端页面：去 views/admin 找
 import Dashboard from '../views/admin/Dashboard.vue'
@@ -48,9 +54,14 @@ const router = createRouter({
       children: [
         { path: '/home', component: FlightSearch },
         { path: '/orders', component: MyOrders },
+        { path: '/order-detail', component: OrderDetail },
         { path: '/mine', component: Mine },
         { path: '/book', component: BookingConfirm },
-        { path: '/passengers', component: PassengerManage }
+        { path: '/passengers', component: PassengerManage },
+        { path: '/checkin', component: Checkin },
+        { path: '/change', component: ChangeTicket },
+        { path: '/change-records', component: ChangeRecords },
+        { path: '/change-password', component: ChangePassword }
       ]
     },
 
@@ -81,6 +92,26 @@ const router = createRouter({
       ]
     }
   ]
+})
+
+router.beforeEach((to, from, next) => {
+  const token = getToken()
+  const role = getRole()
+
+  if (to.path === '/login' || to.path === '/register') {
+    return next()
+  }
+
+  if (!token) {
+    return next('/login')
+  }
+
+  // 管理端限制
+  if (to.path.startsWith('/admin') && role !== 'admin') {
+    return next('/')
+  }
+
+  next()
 })
 
 export default router

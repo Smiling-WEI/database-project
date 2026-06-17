@@ -144,6 +144,7 @@ const handleLogin = async () => {
     }
 
     localStorage.setItem('token', token)
+    localStorage.setItem('role', isAdmin ? 'admin' : 'user')
     localStorage.setItem('currentUser', JSON.stringify(user))
 
     ElMessage.success('登录成功')

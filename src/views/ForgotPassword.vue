@@ -84,14 +84,7 @@ const handleReset = () => {
   // 先触发前端的规则校验
   resetFormRef.value.validate((valid) => {
     if (valid) {
-      // 模拟发送请求给后端进行信息比对和密码修改
-      console.log('向后端发送密码重置请求：', resetForm)
-      
-      // 模拟后端返回成功
-      ElMessage.success('密码重置成功！请使用新密码登录。')
-      
-      // 瞬间平滑跳转回登录页
-      router.push('/login')
+      ElMessage.info('后端暂未提供密码找回接口，当前无法重置密码')
     } else {
       ElMessage.error('请检查填写的信息格式是否有误！')
       return false

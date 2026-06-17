@@ -16,11 +16,15 @@
           <el-input v-model="regForm.idCard" placeholder="18位身份证号" :prefix-icon="CreditCard" maxlength="18" class="custom-input" />
         </el-form-item>
 
+        <el-form-item prop="phone">
+          <el-input v-model="regForm.phone" placeholder="手机号（选填）" :prefix-icon="Iphone" maxlength="11" class="custom-input" />
+        </el-form-item>
+
         <el-form-item prop="password">
           <el-input v-model="regForm.password" type="password" placeholder="设置密码" :prefix-icon="Lock" show-password class="custom-input" />
         </el-form-item>
 
-        <el-button type="primary" class="login-btn" round @click="handleRegister">注 册</el-button>
+        <el-button type="primary" class="login-btn" round :loading="loading" @click="handleRegister">注 册</el-button>
         
         <div class="extra-links" style="justify-content: center; margin-top: 20px;">
           <a href="#" @click.prevent="router.push('/login')">已有账号？返回登录</a>
@@ -33,28 +37,54 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Lock, Postcard, CreditCard } from '@element-plus/icons-vue'
+import { User, Lock, Postcard, CreditCard, Iphone } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import api from '../api/index'
 
 const router = useRouter()
 const regFormRef = ref(null)
-const regForm = reactive({ username: '', realName: '', idCard: '', password: '' })
+const loading = ref(false)
+const regForm = reactive({
+  username: '',
+  realName: '',
+  idCard: '',
+  phone: '',
+  password: ''
+})
 
 // 注册页的严密表单校验
 const rules = reactive({
   username: [{ required: true, message: '账号不能为空', trigger: 'blur' }],
   realName: [{ required: true, message: '真实姓名不能为空', trigger: 'blur' }],
   idCard: [{ required: true, message: '请输入18位身份证号', trigger: 'blur' }, { len: 18, message: '长度必须为18位', trigger: 'blur' }],
+  phone: [{ pattern: /^$|^1\d{10}$/, message: '请输入 11 位手机号', trigger: 'blur' }],
   password: [{ required: true, message: '密码不能为空', trigger: 'blur' }, { min: 6, message: '密码至少6位', trigger: 'blur' }]
 })
 
-const handleRegister = () => {
-  regFormRef.value.validate((valid) => {
-    if (valid) {
-      ElMessage.success('注册成功！请登录。')
-      router.push('/login') // 注册成功后自动跳回登录页
-    }
-  })
+const handleRegister = async () => {
+  if (!regFormRef.value) return
+
+  const valid = await regFormRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  loading.value = true
+
+  try {
+    await api.post('/register', {
+      username: regForm.username,
+      password: regForm.password,
+      real_name: regForm.realName,
+      id_card: regForm.idCard,
+      phone: regForm.phone || undefined
+    })
+
+    ElMessage.success('注册成功！请登录。')
+    router.push('/login')
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '注册失败')
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
