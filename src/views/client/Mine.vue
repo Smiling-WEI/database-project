@@ -105,11 +105,11 @@
             <el-avatar :size="32" class="mini-avatar">
               <el-icon><User /></el-icon>
             </el-avatar>
-            <div>
+            <div class="mini-passenger-copy">
               <strong>{{ passenger.realName }}</strong>
               <span>身份证：{{ maskIdCard(passenger.idCard) }}</span>
+              <span>手机号：{{ maskPhone(passenger.phone) }}</span>
             </div>
-            <span>{{ maskPhone(passenger.phone) }}</span>
             <el-tag size="small" type="info">{{ passenger.type }}</el-tag>
           </div>
           <el-empty v-if="passengers.length === 0" description="暂无常用乘机人" />
@@ -157,6 +157,85 @@
         <el-button type="primary" @click="saveProfile">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="passwordDialogVisible" title="修改登录密码" width="520px">
+      <el-form :model="passwordForm" label-width="92px">
+        <el-form-item label="原密码">
+          <el-input
+            v-model="passwordForm.oldPassword"
+            type="password"
+            show-password
+            placeholder="请输入当前登录密码"
+          />
+        </el-form-item>
+        <el-form-item label="新密码">
+          <el-input
+            v-model="passwordForm.newPassword"
+            type="password"
+            show-password
+            placeholder="至少 8 位，建议包含大小写字母、数字或符号"
+          />
+          <div class="password-strength">
+            <div class="strength-top">
+              <span>密码强度</span>
+              <strong :class="passwordStrength.level">{{ passwordStrength.text }}</strong>
+            </div>
+            <el-progress
+              :percentage="passwordStrength.percent"
+              :show-text="false"
+              :class="['strength-progress', passwordStrength.level]"
+            />
+            <small>密码长度不少于 8 位，组合越复杂越安全。</small>
+          </div>
+        </el-form-item>
+        <el-form-item label="确认密码">
+          <el-input
+            v-model="passwordForm.confirmPassword"
+            type="password"
+            show-password
+            placeholder="请再次输入新密码"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="passwordDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitPasswordChange">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="phoneDialogVisible" title="修改手机号" width="480px">
+      <el-form :model="phoneForm" label-width="92px">
+        <el-form-item label="手机号">
+          <el-input v-model="phoneForm.phone" maxlength="11" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="phoneDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitPhoneChange">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="emailDialogVisible" title="修改邮箱" width="480px">
+      <el-form :model="emailForm" label-width="92px">
+        <el-form-item label="邮箱">
+          <el-input v-model="emailForm.email" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="emailDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitEmailChange">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="loginRecordsVisible" title="账户登录记录" width="620px">
+      <el-table :data="loginRecords" style="width: 100%">
+        <el-table-column prop="loginTime" label="登录时间" />
+        <el-table-column prop="device" label="设备" />
+        <el-table-column prop="location" label="地点" />
+        <el-table-column prop="status" label="状态" />
+      </el-table>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -216,13 +295,81 @@ const editForm = reactive({
   address: ''
 })
 
+const passwordDialogVisible = ref(false)
+const phoneDialogVisible = ref(false)
+const emailDialogVisible = ref(false)
+const loginRecordsVisible = ref(false)
+
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+const phoneForm = reactive({
+  phone: ''
+})
+
+const emailForm = reactive({
+  email: ''
+})
+
+const loginRecords = ref([])
+
+const passwordStrength = computed(() => {
+  const value = passwordForm.newPassword || ''
+  if (!value) {
+    return {
+      text: '请输入新密码',
+      level: 'empty',
+      percent: 0
+    }
+  }
+
+  let score = 0
+  if (value.length >= 8) score += 1
+  if (/[A-Z]/.test(value)) score += 1
+  if (/[a-z]/.test(value)) score += 1
+  if (/\d/.test(value)) score += 1
+  if (/[^A-Za-z0-9]/.test(value)) score += 1
+
+  if (score <= 2) {
+    return {
+      text: '弱',
+      level: 'weak',
+      percent: 33
+    }
+  }
+
+  if (score <= 4) {
+    return {
+      text: '中',
+      level: 'medium',
+      percent: 66
+    }
+  }
+
+  return {
+    text: '强',
+    level: 'strong',
+    percent: 100
+  }
+})
+
 const growthPercent = computed(() => Math.round((userInfo.growth / 5000) * 100))
 
+const completedFlightCount = computed(() => {
+  return historyOrders.value.filter(order => {
+    const status = order.orderStatus || order.status || ''
+    return status === '已完成' || status === 'completed'
+  }).length
+})
+
 const statCards = computed(() => [
-  { label: '我的订单', value: orders.value.length, desc: '有效订单', icon: Wallet, color: 'blue' },
+  { label: '有效订单', value: orders.value.length, desc: '当前可操作订单', icon: Wallet, color: 'blue' },
   { label: '历史订单', value: historyOrders.value.length, desc: '历史记录', icon: Document, color: 'green' },
   { label: '常用乘机人', value: passengers.value.length, desc: '最多可添加 10 人', icon: User, color: 'orange' },
-  { label: '累计飞行', value: `${historyOrders.value.length} 次`, desc: '后端暂未返回里程', icon: Promotion, color: 'purple' }
+  { label: '累计飞行', value: `${completedFlightCount.value} 次`, desc: '已完成行程次数', icon: Promotion, color: 'purple' }
 ])
 
 const profileRows = computed(() => [
@@ -238,14 +385,15 @@ const profileRows = computed(() => [
 
 const securityRows = computed(() => [
   {
+    key: 'password',
     title: '登录密码',
     desc: '用于登录系统',
     value: '-',
     action: '修改',
-    actionPath: '/change-password',
     icon: Lock
   },
   {
+    key: 'phone',
     title: '手机绑定',
     desc: '用于接收验证码及重要通知',
     value: maskPhone(userInfo.phone),
@@ -253,6 +401,7 @@ const securityRows = computed(() => [
     icon: Iphone
   },
   {
+    key: 'email',
     title: '邮箱绑定',
     desc: '用于接收行程及账单通知',
     value: userInfo.email || '-',
@@ -260,6 +409,7 @@ const securityRows = computed(() => [
     icon: Message
   },
   {
+    key: 'loginRecords',
     title: '账户登录记录',
     desc: '查看最近登录的设备与时间',
     value: '',
@@ -306,17 +456,117 @@ const noticeSettings = reactive([
   }
 ])
 
-const saveProfile = () => {
-  editProfileVisible.value = false
-  ElMessage.info('后端暂未提供个人资料修改接口，当前无法保存')
+const saveProfile = async () => {
+  try {
+    await api.put('/users/me/profile', {
+      realName: editForm.realName,
+      phone: editForm.phone,
+      email: editForm.email
+    })
+
+    ElMessage.success('个人信息修改成功')
+    editProfileVisible.value = false
+    await loadMine()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '个人信息修改失败')
+  }
+}
+
+const submitPasswordChange = async () => {
+  if (!passwordForm.oldPassword || !passwordForm.newPassword) {
+    ElMessage.warning('请输入原密码和新密码')
+    return
+  }
+
+  if (passwordForm.newPassword.length < 8) {
+    ElMessage.warning('新密码不能少于 8 位')
+    return
+  }
+
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    ElMessage.warning('两次输入的新密码不一致')
+    return
+  }
+
+  try {
+    await api.put('/users/me/password', {
+      oldPassword: passwordForm.oldPassword,
+      newPassword: passwordForm.newPassword
+    })
+
+    ElMessage.success('密码修改成功')
+    passwordDialogVisible.value = false
+    passwordForm.oldPassword = ''
+    passwordForm.newPassword = ''
+    passwordForm.confirmPassword = ''
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '密码修改失败')
+  }
+}
+
+const submitPhoneChange = async () => {
+  try {
+    await api.put('/users/me/profile', {
+      realName: userInfo.realName,
+      phone: phoneForm.phone,
+      email: userInfo.email
+    })
+
+    ElMessage.success('手机号修改成功')
+    phoneDialogVisible.value = false
+    await loadMine()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '手机号修改失败')
+  }
+}
+
+const submitEmailChange = async () => {
+  try {
+    await api.put('/users/me/profile', {
+      realName: userInfo.realName,
+      phone: userInfo.phone,
+      email: emailForm.email
+    })
+
+    ElMessage.success('邮箱修改成功')
+    emailDialogVisible.value = false
+    await loadMine()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '邮箱修改失败')
+  }
+}
+
+const openLoginRecords = async () => {
+  try {
+    const response = await api.get('/users/me/login-records')
+    loginRecords.value = response.data.data || []
+    loginRecordsVisible.value = true
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '登录记录查询失败')
+  }
 }
 
 const handleSecurityAction = (item) => {
-  if (item.actionPath) {
-    router.push(item.actionPath)
+  if (item.key === 'password') {
+    passwordDialogVisible.value = true
     return
   }
-  ElMessage.info('该功能将在后续接入')
+
+  if (item.key === 'phone') {
+    phoneForm.phone = userInfo.phone
+    phoneDialogVisible.value = true
+    return
+  }
+
+  if (item.key === 'email') {
+    emailForm.email = userInfo.email
+    emailDialogVisible.value = true
+    return
+  }
+
+  if (item.key === 'loginRecords') {
+    openLoginRecords()
+  }
 }
 
 const getBirthdayFromIdCard = (idCard = '') => {
@@ -374,7 +624,7 @@ const loadMine = async () => {
     userInfo.createdAt = user.createdAt || '-'
     userInfo.idCard = user.id_card || user.idCard || ''
     userInfo.phone = user.phone || ''
-    userInfo.email = user.email || '-'
+    userInfo.email = user.email || ''
     userInfo.birthday = getBirthdayFromIdCard(userInfo.idCard)
     userInfo.gender = getGenderFromIdCard(userInfo.idCard)
 
@@ -717,4 +967,346 @@ onMounted(() => {
     padding: 12px 0;
   }
 }
+
+/* ===== 个人中心页面整体重排优化 ===== */
+
+.mine-page {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.section-title {
+  margin-bottom: 22px;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.profile-card {
+  grid-column: 1 / -1;
+  min-height: 170px;
+  padding: 28px 34px;
+}
+
+.profile-main {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.profile-avatar {
+  flex: 0 0 auto;
+}
+
+.profile-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.name-line h2 {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.profile-info p {
+  margin: 8px 0;
+  color: #475569;
+  font-weight: 700;
+}
+
+.growth-row {
+  max-width: 520px;
+  margin-top: 12px;
+}
+
+.growth-row span,
+.growth-row small {
+  display: block;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.stat-card {
+  min-height: 150px;
+  padding: 22px 18px;
+  justify-content: center;
+}
+
+.stat-card strong {
+  font-size: 34px;
+}
+
+.stat-card small {
+  text-align: center;
+  line-height: 1.4;
+}
+
+.content-grid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.panel-card {
+  min-width: 0;
+  border-radius: 8px;
+}
+
+.info-card,
+.security-card,
+.passengers-card,
+.notice-card {
+  min-height: 300px;
+}
+
+.info-row {
+  grid-template-columns: 140px minmax(0, 1fr) 70px;
+}
+
+.info-row strong {
+  min-width: 0;
+  word-break: break-all;
+}
+
+.security-row,
+.notice-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto auto;
+}
+
+.security-copy,
+.notice-copy {
+  min-width: 0;
+}
+
+.security-copy span,
+.notice-copy span,
+.security-value {
+  line-height: 1.45;
+}
+
+.mini-passenger {
+  grid-template-columns: 40px minmax(0, 1fr) 110px 54px;
+}
+
+.mini-passenger div {
+  min-width: 0;
+}
+
+.mini-passenger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-card {
+    grid-column: 1 / -1;
+  }
+
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-main,
+  .name-line {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .info-row,
+  .security-row,
+  .notice-row,
+  .mini-passenger {
+    grid-template-columns: 1fr;
+    padding: 12px 0;
+  }
+}
+
+
+/* ===== 个人中心问题修复：统计、空白、安全入口、乘机人排版 ===== */
+
+.stat-card {
+  min-height: 132px;
+  padding: 18px 16px;
+}
+
+.stat-card small {
+  min-height: 20px;
+}
+
+.passengers-card,
+.notice-card {
+  min-height: auto;
+}
+
+.mini-passenger-list {
+  min-height: 0;
+}
+
+.mini-passenger {
+  grid-template-columns: 40px minmax(0, 1fr) 54px;
+  align-items: center;
+  min-height: 74px;
+  gap: 12px;
+}
+
+.mini-passenger-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mini-passenger-copy strong {
+  line-height: 1.25;
+}
+
+.mini-passenger-copy span {
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-passenger-link {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.security-row .el-button.is-disabled {
+  color: #94a3b8;
+}
+
+
+/* ===== 个人中心两列独立排列 + 隐藏未接入按钮 ===== */
+
+.content-grid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.content-column {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.security-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+}
+
+.security-row .el-button {
+  display: none;
+}
+
+.passengers-card,
+.notice-card {
+  min-height: auto;
+}
+
+@media (max-width: 1200px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* ===== 恢复账户安全操作按钮 ===== */
+.security-row .el-button {
+  display: inline-flex;
+}
+
+
+/* ===== 个人中心安全功能接入样式 ===== */
+.security-row .el-button {
+  display: inline-flex;
+}
+
+
+/* ===== 账户安全按钮右对齐 + 密码强度提示 ===== */
+
+.security-row {
+  grid-template-columns: 42px minmax(0, 1fr) auto auto;
+}
+
+.security-row .el-button {
+  display: inline-flex;
+  justify-self: end;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.security-value {
+  min-width: 88px;
+  text-align: right;
+}
+
+.password-strength {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.strength-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.strength-top strong.weak {
+  color: #ef4444;
+}
+
+.strength-top strong.medium {
+  color: #f59e0b;
+}
+
+.strength-top strong.strong {
+  color: #10b981;
+}
+
+.strength-top strong.empty {
+  color: #94a3b8;
+}
+
+.password-strength small {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
 </style>

@@ -13,10 +13,10 @@
       type="warning"
       show-icon
       :closable="false"
-      title="改签规则：起飞前2小时可改签，改签需收取手续费，具体以航司规则为准。"
+      title="改签规则：起飞前两小时内不能改签，改签需收取手续费，具体以航司规则为准。"
     />
 
-    <section class="panel">
+    <section class="panel current-panel">
       <h3>当前航班信息</h3>
       <div class="current-flight">
         <div class="airline-block">
@@ -53,7 +53,7 @@
       </div>
     </section>
 
-    <section class="panel">
+    <section class="panel new-flight-panel">
       <h3>选择新航班</h3>
       <div class="search-row">
         <label>
@@ -78,25 +78,33 @@
         </el-button>
       </div>
 
-      <el-table v-loading="searching" :data="flightList" class="flight-table" style="width: 100%">
-        <el-table-column prop="flightNo" label="航班号" />
-        <el-table-column prop="airlineName" label="航空公司" />
-        <el-table-column prop="depAirport" label="出发机场" />
-        <el-table-column prop="arrAirport" label="到达机场" />
-        <el-table-column prop="depTime" label="起飞时间" />
-        <el-table-column prop="arrTime" label="到达时间" />
-        <el-table-column prop="cabinType" label="舱位" />
-        <el-table-column label="价格">
-          <template #default="{ row }">
-            <strong class="price-text">¥{{ row.price }}</strong>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="100">
-          <template #default="{ row }">
-            <el-button type="primary" :disabled="!row.pricingId" @click="selectFlight(row)">选择</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div class="flight-table-scroll">
+        <el-table
+          v-loading="searching"
+          :data="flightList"
+          class="flight-table"
+          style="width: 100%"
+          :fit="false"
+        >
+          <el-table-column prop="flightNo" label="航班号" width="90" />
+          <el-table-column prop="airlineName" label="航空公司" width="160" show-overflow-tooltip />
+          <el-table-column prop="depAirport" label="出发机场" width="180" show-overflow-tooltip />
+          <el-table-column prop="arrAirport" label="到达机场" width="180" show-overflow-tooltip />
+          <el-table-column prop="depTime" label="起飞时间" width="120" />
+          <el-table-column prop="arrTime" label="到达时间" width="120" />
+          <el-table-column prop="cabinType" label="舱位" width="100" />
+          <el-table-column label="价格" width="120">
+            <template #default="{ row }">
+              <strong class="price-text">¥{{ row.price }}</strong>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="110" fixed="right">
+            <template #default="{ row }">
+              <el-button type="primary" :disabled="!row.pricingId" @click="selectFlight(row)">选择</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
       <div class="fee-panel">
         <h3>改签费用预估</h3>
@@ -463,7 +471,7 @@ onMounted(() => {
 }
 
 .route-line i {
-  width: 120px;
+  width: 72px;
   height: 1px;
   background: #cbd5e1;
 }
@@ -585,5 +593,76 @@ onMounted(() => {
   .payable {
     text-align: left;
   }
+}
+/* ===== 改签页布局修正：当前航班横向展开 + 新航班表格横向滚动 ===== */
+
+.current-panel {
+  overflow-x: hidden;
+  overflow-y: visible;
+  padding-bottom: 26px;
+}
+
+.current-flight {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: 190px minmax(520px, 1fr) 180px;
+  gap: 12px;
+  align-items: center;
+}
+
+.route-block {
+  grid-template-columns: 165px 82px 165px;
+  gap: 10px;
+}
+
+.route-city strong {
+  white-space: nowrap;
+  line-height: 1.35;
+}
+
+.route-city {
+  min-width: 0;
+}
+
+.flight-extra {
+  min-width: 180px;
+  padding-left: 18px;
+}
+
+.new-flight-panel {
+  overflow-x: hidden;
+}
+
+.flight-table-scroll {
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: hidden;
+  padding-bottom: 0;
+}
+
+.flight-table {
+  width: 100%;
+  min-width: 0;
+}
+
+.flight-table :deep(.cell) {
+  white-space: nowrap;
+}
+
+.flight-table-scroll::-webkit-scrollbar,
+.current-panel::-webkit-scrollbar {
+  height: 8px;
+}
+
+.flight-table-scroll::-webkit-scrollbar-thumb,
+.current-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.45);
+}
+
+.flight-table-scroll::-webkit-scrollbar-track,
+.current-panel::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.9);
 }
 </style>

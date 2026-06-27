@@ -39,6 +39,8 @@ def search_flights():
                     dep_airport.airport_name AS dep_airport,
                     arr_airport.airport_name AS arr_airport,
                     fi.status,
+                    DATE_FORMAT(fi.dep_time, '%%H:%%i') AS dep_time,
+                    DATE_FORMAT(fi.arr_time, '%%H:%%i') AS arr_time,
                     (
                         SELECT cp.sale_price
                         FROM cabin_pricing AS cp
@@ -93,8 +95,8 @@ def search_flights():
                     "airlineName": row["airline_name"],
                     "depAirport": row["dep_airport"],
                     "arrAirport": row["arr_airport"],
-                    "depTime": "",
-                    "arrTime": "",
+                    "depTime": row.get("dep_time") or "",
+                    "arrTime": row.get("arr_time") or "",
                     "price": (
                         float(row["price"])
                         if row["price"] is not None

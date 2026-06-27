@@ -40,7 +40,7 @@
               <el-tag v-if="passenger.isDefault" type="primary" size="small">默认</el-tag>
             </div>
             <div class="passenger-type">{{ passenger.type }}</div>
-            <div class="muted">证件号：{{ passenger.idCard }}</div>
+            <div class="muted">证件号：{{ maskIdCard(passenger.idCard) }}</div>
             <div class="muted">手机：{{ maskPhone(passenger.phone) }}</div>
           </div>
 
@@ -299,6 +299,12 @@ const maskPhone = (phone = '') => {
   return `${phone.slice(0, 3)}****${phone.slice(-4)}`
 }
 
+const maskIdCard = (idCard = '') => {
+  if (!idCard) return '-'
+  if (idCard.length < 10) return idCard
+  return `${idCard.slice(0, 6)}********${idCard.slice(-4)}`
+}
+
 onMounted(() => {
   loadPassengers()
 })
@@ -481,4 +487,378 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== 常用乘机人卡片边界与隐私展示优化 ===== */
+
+.passenger-list {
+  border-radius: 8px;
+}
+
+.passenger-card {
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 24px rgba(30, 93, 140, 0.08);
+}
+
+.detail-grid {
+  padding: 18px 22px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.86);
+}
+
+
+/* ===== 常用乘机人卡片最终排版修正 ===== */
+
+.passenger-card {
+  width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 72px minmax(220px, 1fr) minmax(360px, 1.25fr) 140px;
+  gap: 18px;
+  align-items: center;
+  padding: 24px 28px;
+  overflow: hidden;
+}
+
+.passenger-card > * {
+  min-width: 0;
+}
+
+.avatar-block {
+  width: 72px;
+  display: flex;
+  justify-content: center;
+}
+
+.info-block {
+  min-width: 0;
+}
+
+.info-block .muted {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail-grid {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(130px, 1fr));
+  gap: 16px 28px;
+  padding: 18px 20px;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.86);
+}
+
+.detail-grid div {
+  min-width: 0;
+}
+
+.detail-grid span,
+.detail-grid strong {
+  display: block;
+  white-space: nowrap;
+}
+
+.detail-grid strong {
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action-buttons,
+.action-block,
+.passenger-actions,
+.passenger-card > div:last-child {
+  width: 140px;
+  min-width: 140px;
+  justify-self: end;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.action-buttons .el-button,
+.action-block .el-button,
+.passenger-actions .el-button,
+.passenger-card > div:last-child .el-button {
+  width: 100%;
+  margin-left: 0;
+}
+
+@media (max-width: 1100px) {
+  .passenger-card {
+    grid-template-columns: 72px 1fr;
+  }
+
+  .detail-grid,
+  .action-buttons,
+  .action-block,
+  .passenger-actions,
+  .passenger-card > div:last-child {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+
+/* ===== 常用乘机人出生年月完整展示 ===== */
+
+.passenger-card {
+  grid-template-columns: 72px 260px minmax(520px, 1fr) 150px;
+  gap: 18px;
+}
+
+.info-block {
+  padding-left: 0;
+}
+
+.detail-grid {
+  min-width: 520px;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 18px 36px;
+}
+
+.detail-grid strong {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .detail-grid {
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+}
+
+
+/* ===== 常用乘机人卡片布局最终恢复：按钮回卡片内 + 出生日期完整显示 ===== */
+
+.passenger-card {
+  width: 100%;
+  box-sizing: border-box;
+  display: grid !important;
+  grid-template-columns: 72px minmax(240px, 0.9fr) minmax(430px, 1.35fr) 150px !important;
+  gap: 18px !important;
+  align-items: center !important;
+  padding: 24px 28px !important;
+  overflow: visible !important;
+}
+
+.passenger-card > * {
+  min-width: 0;
+}
+
+.avatar-block {
+  width: 72px;
+  display: flex;
+  justify-content: center;
+}
+
+.info-block {
+  min-width: 0;
+  padding-left: 0 !important;
+}
+
+.info-block .muted {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail-grid {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 18px 34px !important;
+  padding: 18px 20px !important;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.86);
+}
+
+.detail-grid div {
+  min-width: 0;
+}
+
+.detail-grid span,
+.detail-grid strong {
+  display: block;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+.detail-grid strong {
+  margin-top: 6px;
+}
+
+/* 第四列就是右侧按钮区，不依赖原来的类名 */
+.passenger-card > :nth-child(4) {
+  width: 150px !important;
+  min-width: 150px !important;
+  justify-self: end !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+
+.passenger-card > :nth-child(4) .el-button {
+  width: 100% !important;
+  margin-left: 0 !important;
+}
+
+@media (max-width: 1100px) {
+  .passenger-card {
+    grid-template-columns: 72px 1fr !important;
+  }
+
+  .detail-grid,
+  .passenger-card > :nth-child(4) {
+    grid-column: 1 / -1;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+}
+
+
+/* ===== 常用乘机人卡片强制最终布局：彻底覆盖旧样式 ===== */
+
+.passenger-list {
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden !important;
+}
+
+.passenger-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-columns: 56px 220px 1fr 116px !important;
+  gap: 14px !important;
+  align-items: center !important;
+  padding: 22px 20px !important;
+  overflow: hidden !important;
+}
+
+.passenger-card > * {
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.avatar-block {
+  width: 56px !important;
+  min-width: 56px !important;
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.passenger-avatar {
+  width: 50px !important;
+  height: 50px !important;
+}
+
+.info-block {
+  width: 220px !important;
+  min-width: 0 !important;
+  padding-left: 0 !important;
+}
+
+.info-block .name-line {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+}
+
+.info-block .name-line h3,
+.info-block strong {
+  white-space: nowrap !important;
+}
+
+.info-block .muted {
+  max-width: 210px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.detail-grid {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 16px 24px !important;
+  padding: 16px 18px !important;
+  border: 1px solid rgba(226, 232, 240, 0.95) !important;
+  border-radius: 8px !important;
+  background: rgba(248, 250, 252, 0.9) !important;
+}
+
+.detail-grid div {
+  min-width: 0 !important;
+}
+
+.detail-grid span {
+  display: block !important;
+  color: #64748b !important;
+  white-space: nowrap !important;
+}
+
+.detail-grid strong {
+  display: block !important;
+  margin-top: 6px !important;
+  color: #0f172a !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
+
+/* 第四个子元素就是右侧操作按钮区 */
+.passenger-card > :nth-child(4) {
+  width: 116px !important;
+  min-width: 116px !important;
+  max-width: 116px !important;
+  justify-self: end !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+.passenger-card > :nth-child(4) .el-button {
+  width: 116px !important;
+  min-width: 116px !important;
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+@media (max-width: 1100px) {
+  .passenger-card {
+    grid-template-columns: 56px 1fr !important;
+  }
+
+  .detail-grid,
+  .passenger-card > :nth-child(4) {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .passenger-card > :nth-child(4) .el-button {
+    width: 100% !important;
+  }
+}
+
 </style>

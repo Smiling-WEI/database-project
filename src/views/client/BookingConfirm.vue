@@ -23,7 +23,7 @@
 
         <div class="route-timeline-wrapper">
           <div class="timeline-city">
-            <div class="city-code">{{ flightInfo.depAirportCode }}</div>
+            <div class="city-code">{{ flightInfo.depTime }}</div>
             <div class="city-name">{{ flightInfo.depCity }}</div>
             <div class="terminal">{{ flightInfo.depAirport }}</div>
           </div>
@@ -40,23 +40,13 @@
           </div>
 
           <div class="timeline-city text-right">
-            <div class="city-code">{{ flightInfo.arrAirportCode }}</div>
+            <div class="city-code">{{ flightInfo.arrTime }}</div>
             <div class="city-name">{{ flightInfo.arrCity }}</div>
             <div class="terminal">{{ flightInfo.arrAirport }}</div>
           </div>
         </div>
 
-        <div class="time-data-row">
-          <div class="exact-time-block">
-            <div class="exact-time">{{ flightInfo.depTime }}</div>
-            <div class="exact-date">{{ flightInfo.formattedDate }}</div>
-          </div>
-          <el-divider direction="vertical" class="time-divider" />
-          <div class="exact-time-block text-right">
-            <div class="exact-time">{{ flightInfo.arrTime }}</div>
-            <div class="exact-date">{{ flightInfo.formattedDate }}</div>
-          </div>
-        </div>
+
       </div>
     </section>
 

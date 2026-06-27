@@ -492,7 +492,7 @@ def change_order(order_id):
 @change_bp.get("/change-records")
 @login_required
 def list_change_records():
-    """查询当前用户的全部改签记录。"""
+    """查询当前用户的全部退改记录：包括改签记录和退票记录。"""
     connection = None
 
     try:
@@ -517,10 +517,88 @@ def list_change_records():
                     cr.change_reason,
                     cr.status,
                     cr.created_at,
-                    cr.completed_at
+                    cr.completed_at,
+
+                    old_fi.flight_no AS old_flight_no,
+                    old_fi.flight_date AS old_flight_date,
+                    DATE_FORMAT(old_fi.dep_time, '%%H:%%i') AS old_dep_time,
+                    DATE_FORMAT(old_fi.arr_time, '%%H:%%i') AS old_arr_time,
+                    old_ac.airline_name AS old_airline_name,
+                    old_dep_airport.airport_name AS old_dep_airport,
+                    old_arr_airport.airport_name AS old_arr_airport,
+                    old_cp.cabin_type AS old_cabin_type,
+
+                    new_fi.flight_no AS new_flight_no,
+                    new_fi.flight_date AS new_flight_date,
+                    DATE_FORMAT(new_fi.dep_time, '%%H:%%i') AS new_dep_time,
+                    DATE_FORMAT(new_fi.arr_time, '%%H:%%i') AS new_arr_time,
+                    new_ac.airline_name AS new_airline_name,
+                    new_dep_airport.airport_name AS new_dep_airport,
+                    new_arr_airport.airport_name AS new_arr_airport,
+                    new_cp.cabin_type AS new_cabin_type
+
                 FROM change_record AS cr
+
                 JOIN archive_ticket_sale AS old_order
                   ON old_order.order_id = cr.old_order_id
+
+                JOIN flight_instance AS old_fi
+                  ON old_fi.instance_id = old_order.instance_id
+                JOIN flight_no_info AS old_fni
+                  ON old_fni.flight_no = old_fi.flight_no
+                JOIN airline_company AS old_ac
+                  ON old_ac.airline_id = old_fni.airline_id
+                JOIN route AS old_route
+                  ON old_route.route_id = old_fni.route_id
+                JOIN airport AS old_dep_airport
+                  ON old_dep_airport.airport_code = old_route.dep_airport_code
+                JOIN airport AS old_arr_airport
+                  ON old_arr_airport.airport_code = old_route.arr_airport_code
+                JOIN cabin_pricing AS old_cp
+                  ON old_cp.pricing_id = old_order.pricing_id
+
+                LEFT JOIN (
+                    SELECT
+                        order_id,
+                        user_id,
+                        passenger_id,
+                        instance_id,
+                        pricing_id,
+                        seat_no,
+                        purchase_time,
+                        order_status
+                    FROM active_ticket_sale
+
+                    UNION ALL
+
+                    SELECT
+                        order_id,
+                        user_id,
+                        passenger_id,
+                        instance_id,
+                        pricing_id,
+                        seat_no,
+                        purchase_time,
+                        order_status
+                    FROM archive_ticket_sale
+                ) AS new_order
+                  ON new_order.order_id = cr.new_order_id
+
+                LEFT JOIN flight_instance AS new_fi
+                  ON new_fi.instance_id = new_order.instance_id
+                LEFT JOIN flight_no_info AS new_fni
+                  ON new_fni.flight_no = new_fi.flight_no
+                LEFT JOIN airline_company AS new_ac
+                  ON new_ac.airline_id = new_fni.airline_id
+                LEFT JOIN route AS new_route
+                  ON new_route.route_id = new_fni.route_id
+                LEFT JOIN airport AS new_dep_airport
+                  ON new_dep_airport.airport_code = new_route.dep_airport_code
+                LEFT JOIN airport AS new_arr_airport
+                  ON new_arr_airport.airport_code = new_route.arr_airport_code
+                LEFT JOIN cabin_pricing AS new_cp
+                  ON new_cp.pricing_id = new_order.pricing_id
+
                 WHERE old_order.user_id = %s
                 ORDER BY cr.created_at DESC, cr.change_id DESC
                 """,
@@ -529,42 +607,72 @@ def list_change_records():
 
             rows = cursor.fetchall()
 
-        records = [
-            {
-                "changeId": row["change_id"],
-                "oldOrderId": row["old_order_id"],
-                "newOrderId": row["new_order_id"],
-                "ruleId": row["rule_id"],
-                "changeType": row["change_type"],
-                "irregularityId": row["irregularity_id"],
-                "oldTicketPrice": float(row["old_ticket_price"]),
-                "newTicketPrice": float(row["new_ticket_price"]),
-                "fareDifference": float(row["fare_difference"]),
-                "changeFee": float(row["change_fee"]),
-                "payableAmount": float(row["payable_amount"]),
-                "refundableAmount": float(row["refundable_amount"]),
-                "changeReason": row["change_reason"],
-                "status": row["status"],
-                "createdAt": row["created_at"].isoformat(
-                    sep=" ",
-                    timespec="seconds",
-                ),
-                "completedAt": (
-                    row["completed_at"].isoformat(
+        records = []
+
+        for row in rows:
+            is_refund = "退票" in row["change_type"]
+
+            records.append(
+                {
+                    "changeId": row["change_id"],
+                    "changeNo": f"CC{row['change_id']}",
+                    "recordType": "refund" if is_refund else "change",
+                    "oldOrderId": row["old_order_id"],
+                    "newOrderId": row["new_order_id"],
+                    "ruleId": row["rule_id"],
+                    "changeType": row["change_type"],
+                    "irregularityId": row["irregularity_id"],
+
+                    "oldFlightNo": row["old_flight_no"],
+                    "oldAirlineName": row["old_airline_name"],
+                    "oldDepAirport": row["old_dep_airport"],
+                    "oldArrAirport": row["old_arr_airport"],
+                    "oldFlightDate": row["old_flight_date"].isoformat(),
+                    "oldDepTime": row["old_dep_time"] or "",
+                    "oldArrTime": row["old_arr_time"] or "",
+                    "oldCabinType": row["old_cabin_type"],
+
+                    "newFlightNo": row["new_flight_no"],
+                    "newAirlineName": row["new_airline_name"],
+                    "newDepAirport": row["new_dep_airport"],
+                    "newArrAirport": row["new_arr_airport"],
+                    "newFlightDate": (
+                        row["new_flight_date"].isoformat()
+                        if row["new_flight_date"] is not None
+                        else None
+                    ),
+                    "newDepTime": row["new_dep_time"] or "",
+                    "newArrTime": row["new_arr_time"] or "",
+                    "newCabinType": row["new_cabin_type"],
+
+                    "oldTicketPrice": float(row["old_ticket_price"]),
+                    "newTicketPrice": float(row["new_ticket_price"]),
+                    "fareDifference": float(row["fare_difference"]),
+                    "changeFee": float(row["change_fee"]),
+                    "refundFee": float(row["change_fee"]),
+                    "payableAmount": float(row["payable_amount"]),
+                    "refundableAmount": float(row["refundable_amount"]),
+                    "changeReason": row["change_reason"],
+                    "status": row["status"],
+                    "createdAt": row["created_at"].isoformat(
                         sep=" ",
                         timespec="seconds",
-                    )
-                    if row["completed_at"] is not None
-                    else None
-                ),
-            }
-            for row in rows
-        ]
+                    ),
+                    "completedAt": (
+                        row["completed_at"].isoformat(
+                            sep=" ",
+                            timespec="seconds",
+                        )
+                        if row["completed_at"] is not None
+                        else None
+                    ),
+                }
+            )
 
         return success_response(records, "查询成功")
 
     except Exception as error:
-        return error_response("改签记录查询失败", 500, error)
+        return error_response("退改记录查询失败", 500, error)
 
     finally:
         if connection is not None:

@@ -114,12 +114,14 @@
 
         <div class="order-card-body">
           <div class="flight-summary">
-            <div class="airline-line">
+                        <div class="airline-line">
               <span class="airline-logo" :class="order.airlineCode"></span>
-              <strong>{{ order.airlineName }}</strong>
-              <span>{{ order.flightNo }}</span>
+              <div class="airline-text">
+                <strong>{{ order.airlineName }}</strong>
+                <span>{{ order.flightNo }}</span>
+                <em>{{ order.cabinType }}</em>
+              </div>
             </div>
-            <div class="rule-link">{{ order.cabinType }}　退改签规则</div>
           </div>
 
           <div class="route-block">
@@ -168,7 +170,6 @@
             <el-button
               v-if="activeTab === 'active'"
               plain
-              :disabled="Boolean(order.seatNo)"
               @click="handleChange(order)"
             >
               申请改签
@@ -331,14 +332,31 @@ const resetFilters = () => {
 }
 
 const handleRefund = async (order) => {
+  let preview = null
+
+  try {
+    const previewResponse = await api.post(`/orders/${order.orderId}/refund-preview`, {})
+    preview = previewResponse.data.data
+  } catch (error) {
+    ElMessage.error(error.response?.data?.message || '退票费用计算失败')
+    return
+  }
+
   try {
     await ElMessageBox.confirm(
-      `确定要为 ${order.passengerName} 申请 ${order.flightNo} 航班退票吗？`,
-      '退票确认',
+      `<div class="refund-confirm-message">
+        <p>确定要为 <strong>${order.passengerName}</strong> 申请 <strong>${order.flightNo}</strong> 航班退票吗？</p>
+        <p>原票价：<strong>¥${preview.ticketPrice}</strong></p>
+        <p>退票手续费：<strong>¥${preview.refundFee}</strong></p>
+        <p>实际退款：<strong class="refund-amount">¥${preview.refundableAmount}</strong></p>
+        <p>规则：${preview.ruleText}</p>
+      </div>`,
+      '退票费用确认',
       {
-        confirmButtonText: '确定退票',
+        confirmButtonText: '确认退票',
         cancelButtonText: '暂不退票',
-        type: 'warning'
+        type: 'warning',
+        dangerouslyUseHTMLString: true
       }
     )
   } catch {
@@ -348,14 +366,18 @@ const handleRefund = async (order) => {
   refundingOrderId.value = order.orderId
 
   try {
-    const response = await api.post(`/orders/${order.orderId}/refund`, {})
+    const response = await api.post(`/orders/${order.orderId}/refund`, {
+      refund_reason: '乘客主动退票'
+    })
 
     if (!response.data.success) {
       ElMessage.error(response.data.message || '退票失败')
       return
     }
 
-    ElMessage.success('退票成功，订单已转入历史记录')
+    ElMessage.success(
+      `退票成功，手续费 ¥${response.data.data.refundFee}，实际退款 ¥${response.data.data.refundableAmount}`
+    )
     await loadOrders()
   } catch (error) {
     ElMessage.error(error.response?.data?.message || '退票失败')
@@ -703,9 +725,9 @@ onMounted(() => {
 }
 
 @media (max-width: 1200px) {
-  .filter-row,
-  .order-card-body {
-    grid-template-columns: 1fr;
+  .filter-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
   }
 
   .date-range,
@@ -714,14 +736,451 @@ onMounted(() => {
     width: 100%;
   }
 
-  .order-card-top {
-    grid-template-columns: 1fr;
-    padding: 16px 20px;
+  .filter-actions {
+    grid-column: 1 / -1;
   }
 
-  .action-block {
-    flex-direction: row;
-    flex-wrap: wrap;
+  .order-card-top {
+    min-width: 1120px;
+  }
+
+  .order-card-body {
+    min-width: 1120px;
   }
 }
+.order-card {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.order-card-top {
+  min-width: 1120px;
+  grid-template-columns: 1.1fr 1fr 180px;
+}
+
+.order-card-body {
+  min-width: 1120px;
+  grid-template-columns: 180px 430px 220px 130px 140px;
+  gap: 28px;
+}
+
+.airline-line {
+  align-items: flex-start;
+}
+
+.airline-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  line-height: 1.25;
+}
+
+.airline-text strong {
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.airline-text span {
+  font-size: 15px;
+  color: #334155;
+  font-weight: 700;
+}
+
+.airline-text em {
+  width: fit-content;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #0b7cff;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.route-block {
+  grid-template-columns: 145px 120px 145px;
+  gap: 10px;
+}
+
+.airport {
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.passenger-block,
+.seat-block {
+  min-width: 0;
+  line-height: 1.45;
+}
+
+.action-block {
+  min-width: 120px;
+}
+
+.action-block .el-button {
+  width: 100%;
+  margin-left: 0;
+}
+/* ===== 我的订单页布局二次修正：筛选区 + 订单卡横向留白 ===== */
+
+.orders-page {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.filter-panel {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.filter-row {
+  min-width: 1120px;
+  grid-template-columns: 320px 200px 220px 220px 96px;
+  gap: 24px;
+}
+
+.date-range {
+  width: 320px;
+}
+
+.filter-input {
+  width: 100%;
+}
+
+.filter-actions {
+  grid-column: auto;
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-end;
+}
+
+.filter-actions .el-button {
+  width: 96px;
+}
+
+.order-card {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+}
+
+.order-card-top,
+.order-card-body {
+  width: 1240px;
+  min-width: 1240px;
+  box-sizing: border-box;
+}
+
+.order-card-top {
+  padding-left: 36px;
+  padding-right: 36px;
+  grid-template-columns: 1.1fr 1fr 180px;
+}
+
+.order-card-body {
+  padding-left: 36px;
+  padding-right: 42px;
+  grid-template-columns: 180px 450px 240px 150px 180px;
+  gap: 28px;
+}
+
+.action-block {
+  padding-right: 8px;
+}
+
+.action-block .el-button {
+  width: 150px;
+}
+
+@media (max-width: 1200px) {
+  .filter-row {
+    min-width: 1120px;
+    grid-template-columns: 320px 200px 220px 220px 96px;
+  }
+
+  .filter-actions {
+    grid-column: auto;
+  }
+
+  .order-card-top,
+  .order-card-body {
+    width: 1240px;
+    min-width: 1240px;
+  }
+}
+/* ===== 查询筛选区改为两行自适应布局，不再横向滚动 ===== */
+
+.filter-panel {
+  overflow-x: visible;
+  overflow-y: visible;
+}
+
+.filter-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1.2fr 1.2fr auto;
+  gap: 18px 22px;
+  align-items: end;
+}
+
+.date-range,
+.filter-input {
+  width: 100%;
+}
+
+.filter-actions {
+  grid-column: auto;
+  display: flex;
+  align-items: flex-end;
+}
+
+.filter-actions .el-button {
+  width: 88px;
+}
+
+@media (max-width: 1400px) {
+  .filter-row {
+    min-width: 0;
+    grid-template-columns: 1.5fr 1fr 1fr;
+  }
+
+  .filter-item:nth-child(1) {
+    grid-column: span 2;
+  }
+
+  .filter-actions {
+    grid-column: 3;
+  }
+}
+
+@media (max-width: 1050px) {
+  .filter-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .filter-item:nth-child(1),
+  .filter-actions {
+    grid-column: 1 / -1;
+  }
+}
+/* ===== 查询筛选区最终版：一行平铺 ===== */
+
+.filter-panel {
+  overflow-x: visible;
+}
+
+.filter-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 300px 170px 180px 180px 190px;
+  gap: 14px;
+  align-items: end;
+}
+
+.filter-item:nth-child(1),
+.filter-actions {
+  grid-column: auto;
+}
+
+.date-range {
+  width: 300px;
+}
+
+.filter-input {
+  width: 100%;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+  align-items: flex-end;
+}
+
+.filter-actions .el-button {
+  width: 88px;
+  margin-left: 0;
+}
+
+@media (max-width: 1400px) {
+  .filter-row {
+    min-width: 0;
+    grid-template-columns: 300px 170px 180px 180px 190px;
+  }
+
+  .filter-item:nth-child(1),
+  .filter-actions {
+    grid-column: auto;
+  }
+}
+/* ===== 查询筛选区最终修正：内部横向滚动，布局放宽，不撑开整页 ===== */
+
+.orders-page {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.filter-panel {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 28px;
+}
+
+.filter-row {
+  width: 1320px;
+  min-width: 1320px;
+  display: grid;
+  grid-template-columns: 360px 220px 240px 240px 220px;
+  gap: 24px;
+  align-items: end;
+}
+
+.filter-item:nth-child(1),
+.filter-actions {
+  grid-column: auto;
+}
+
+.date-range {
+  width: 360px;
+}
+
+.filter-input {
+  width: 100%;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-start;
+  align-items: flex-end;
+}
+
+.filter-actions .el-button {
+  width: 96px;
+  margin-left: 0;
+}
+
+.filter-panel::-webkit-scrollbar {
+  height: 8px;
+}
+
+.filter-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.45);
+}
+
+.filter-panel::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.9);
+}
+
+@media (max-width: 1400px) {
+  .filter-row {
+    width: 1320px;
+    min-width: 1320px;
+    grid-template-columns: 360px 220px 240px 240px 220px;
+  }
+
+  .filter-item:nth-child(1),
+  .filter-actions {
+    grid-column: auto;
+  }
+}
+/* ===== 查询筛选区最终修正 2：只让表单行滚动，不让 Tabs 横线滚动 ===== */
+
+.filter-panel {
+  overflow-x: visible;
+  overflow-y: visible;
+}
+
+.filter-row {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 24px;
+  align-items: flex-end;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 14px;
+}
+
+.filter-item {
+  flex: 0 0 auto;
+}
+
+.filter-item:nth-child(1) {
+  width: 360px;
+}
+
+.filter-item:nth-child(2) {
+  width: 220px;
+}
+
+.filter-item:nth-child(3),
+.filter-item:nth-child(4) {
+  width: 240px;
+}
+
+.filter-actions {
+  flex: 0 0 220px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.date-range {
+  width: 100%;
+}
+
+.filter-input {
+  width: 100%;
+}
+
+.filter-actions .el-button {
+  width: 96px;
+  margin-left: 0;
+}
+
+.filter-row::-webkit-scrollbar {
+  height: 8px;
+}
+
+.filter-row::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.45);
+}
+
+.filter-row::-webkit-scrollbar-track {
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.9);
+}
+
+/* ===== 退票确认弹窗格式优化 ===== */
+:deep(.refund-confirm-message) {
+  line-height: 1.8;
+  font-size: 15px;
+}
+
+:deep(.refund-confirm-message p) {
+  margin: 4px 0;
+}
+
+:deep(.refund-confirm-message p:first-child) {
+  margin-bottom: 10px;
+}
+
+:deep(.refund-confirm-message strong) {
+  color: #0f172a;
+}
+
+:deep(.refund-confirm-message .refund-amount) {
+  color: #ef233c;
+}
+
 </style>

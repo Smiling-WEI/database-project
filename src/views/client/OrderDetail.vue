@@ -36,8 +36,11 @@
         </div>
       </div>
       <div class="summary-actions">
-        <el-button type="danger" plain @click="goBackOrders">退票</el-button>
-        <el-button plain type="primary" @click="goChange">改签</el-button>
+        <template v-if="canOperateOrder">
+          <el-button type="danger" plain @click="goBackOrders">退票</el-button>
+          <el-button plain type="primary" @click="goChange">改签</el-button>
+        </template>
+        <el-button v-else plain disabled>历史订单</el-button>
         <el-button plain type="primary" disabled>发票</el-button>
       </div>
     </section>
@@ -125,10 +128,18 @@ const router = useRouter()
 const loading = ref(false)
 const orderId = computed(() => Number(route.query.orderId))
 
+const canOperateOrder = computed(() => {
+  const status = order.value.orderStatus
+  const source = order.value.orderSource
+
+  return source === 'active' && ['已支付', '已出票'].includes(status)
+})
+
 const order = ref({
   orderId: null,
   orderNo: '',
   orderStatus: '',
+  orderSource: '',
   purchaseTime: '',
   price: 0,
   airlineCode: '',
@@ -181,6 +192,7 @@ const normalizeOrder = (data) => {
     orderId: data.orderId,
     orderNo: data.orderNo || `OD${data.orderId}`,
     orderStatus: data.orderStatus || '',
+    orderSource: data.orderSource || '',
     purchaseTime: data.purchaseTime || '',
     price: Number(data.price || 0),
     airlineCode: data.airlineCode || '',
@@ -457,5 +469,89 @@ onMounted(() => {
     position: static;
     margin-top: 22px;
   }
+}
+
+/* ===== 订单详情页：航班信息区域重排 ===== */
+
+.flight-info {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 170px minmax(480px, 1fr) 150px;
+  gap: 10px;
+  align-items: center;
+  overflow: hidden;
+}
+
+.airline-block {
+  min-width: 0;
+  gap: 8px;
+}
+
+.airline-block strong {
+  display: block;
+  line-height: 1.3;
+  font-size: 18px;
+  word-break: keep-all;
+}
+
+.airline-block p {
+  margin-top: 4px;
+  line-height: 1.3;
+  font-size: 14px;
+}
+
+.route-block {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 64px minmax(150px, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+
+.route-city {
+  min-width: 0;
+  gap: 4px;
+}
+
+.route-city strong {
+  white-space: normal;
+  line-height: 1.25;
+  font-size: 14px;
+}
+
+.route-city.right {
+  text-align: left;
+}
+
+.flight-time {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.route-line {
+  gap: 4px;
+}
+
+.route-line i {
+  width: 52px;
+}
+
+.flight-extra {
+  min-width: 0;
+  padding-left: 8px;
+  gap: 8px;
+}
+
+.flight-extra div {
+  display: grid;
+  grid-template-columns: 56px auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.flight-extra span,
+.flight-extra strong {
+  white-space: nowrap;
+  font-size: 14px;
 }
 </style>

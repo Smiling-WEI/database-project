@@ -31,7 +31,7 @@
         </el-menu-item>
         <el-menu-item index="/change-records">
           <el-icon><Bell /></el-icon>
-          <span>改签记录</span>
+          <span>退改记录</span>
         </el-menu-item>
         <el-menu-item index="/mine">
           <el-icon><Avatar /></el-icon>
