@@ -1,14 +1,14 @@
 <template>
   <PageContainer
     title="航班管理"
-    description="维护航班实例、执飞机型、座位数与运行状态"
+    description="维护航班实例、起降时间、执飞机型、座位数与运行状态"
   >
     <template #extra>
- <el-button
-  type="primary"
-  :disabled="!canManageFlights"
-  @click="goAddFlight"
->
+      <el-button
+        type="primary"
+        :disabled="!canManageFlights || isFlightReadonly(row)"
+        @click="goAddFlight"
+      >
         <el-icon><Plus /></el-icon>
         新增航班
       </el-button>
@@ -23,7 +23,6 @@
       </el-form>
     </div>
 
-    <!-- 筛选区域 -->
     <div class="filter-card">
       <el-form
         :model="queryForm"
@@ -51,6 +50,7 @@
             <el-option label="正常" value="正常" />
             <el-option label="延误" value="延误" />
             <el-option label="取消" value="取消" />
+            <el-option label="航班调整" value="航班调整" />
             <el-option label="已完成" value="已完成" />
           </el-select>
         </el-form-item>
@@ -74,15 +74,15 @@
       </el-form>
     </div>
 
-    <!-- 表格区域 -->
-<el-alert
-  v-if="!canManageFlights"
-  title="当前岗位仅可查看航班信息，无权新增、编辑航班或发布航班异常"
-  type="info"
-  :closable="false"
-  show-icon
-  class="permission-alert"
-/>
+    <el-alert
+      v-if="!canManageFlights"
+      title="当前岗位仅可查看航班信息，无权新增、编辑航班或发布航班异常"
+      type="info"
+      :closable="false"
+      show-icon
+      class="permission-alert"
+    />
+
     <div class="table-card">
       <el-table
         :data="pagedFlights"
@@ -95,6 +95,8 @@
         <el-table-column prop="instanceId" label="实例ID" width="90" />
         <el-table-column prop="flightNo" label="航班号" width="110" />
         <el-table-column prop="flightDate" label="航班日期" width="120" />
+        <el-table-column prop="depTime" label="起飞时间" width="100" />
+        <el-table-column prop="arrTime" label="到达时间" width="100" />
         <el-table-column prop="airlineName" label="航空公司" width="140" show-overflow-tooltip />
         <el-table-column prop="depAirport" label="出发机场" min-width="160" show-overflow-tooltip />
         <el-table-column prop="arrAirport" label="到达机场" min-width="160" show-overflow-tooltip />
@@ -105,39 +107,39 @@
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">
-              {{ row.status || '未知' }}
+              {{ getFlightDisplayStatus(row) }}
             </el-tag>
           </template>
         </el-table-column>
 
-<el-table-column label="操作" fixed="right" width="220">
-  <template #default="{ row }">
-    <el-button
-      type="primary"
-      link
-      :disabled="!canManageFlights"
-      @click="goEditFlight(row)"
-    >
-      编辑
-    </el-button>
+        <el-table-column label="操作" fixed="right" width="220">
+          <template #default="{ row }">
+            <el-button
+              type="primary"
+              link
+              :disabled="!canManageFlights"
+              @click="goEditFlight(row)"
+            >
+              编辑
+            </el-button>
 
-    <el-button
-      type="success"
-      link
-      @click="goPricing(row)"
-    >
-      票价
-    </el-button>
+            <el-button
+              type="success"
+              link
+              @click="goPricing(row)"
+            >
+              票价
+            </el-button>
 
-    <el-button
-      type="warning"
-      link
-      @click="goIrregularity(row)"
-    >
-      异常
-    </el-button>
-  </template>
-</el-table-column>        
+            <el-button
+              type="warning"
+              link
+              :disabled="!canEditFlightPage" @click="goIrregularity(row)"
+            >
+              异常
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <div class="pagination-wrap">
@@ -159,6 +161,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import PageContainer from '../../../components/admin/PageContainer.vue'
+import { canWriteFlightModule } from '../../../utils/adminAuth'
 import AirlineScopeSelect from '../../../components/admin/AirlineScopeSelect.vue'
 import { getAdminFlights } from '../../../api/admin/flight'
 import {
@@ -275,10 +278,53 @@ const goIrregularity = (row) => {
   router.push(`/admin/flights/${row.instanceId}/irregularities`)
 }
 
+
+const parseFlightEndTime = (flight) => {
+  if (!flight?.flightDate) return null
+
+  const depText = flight.depTime || '00:00'
+  const arrText = flight.arrTime || depText || '23:59'
+
+  const dep = new Date(`${flight.flightDate}T${depText}:00`)
+  let arr = new Date(`${flight.flightDate}T${arrText}:00`)
+
+  if (Number.isNaN(arr.getTime())) {
+    return new Date(`${flight.flightDate}T23:59:59`)
+  }
+
+  if (!Number.isNaN(dep.getTime()) && arr <= dep) {
+    arr = new Date(arr.getTime() + 24 * 60 * 60 * 1000)
+  }
+
+  return arr
+}
+
+const isFlightClosed = (flight) => {
+  if (!flight) return false
+
+  if (['已完成', '取消', '航班调整'].includes(flight.status)) {
+    return true
+  }
+
+  const endTime = parseFlightEndTime(flight)
+  return endTime ? endTime < new Date() : false
+}
+
+const isFlightReadonly = (flight) => {
+  return isFlightClosed(flight)
+}
+
+const getFlightDisplayStatus = (flight) => {
+  if (flight?.status === '航班调整') return '航班调整'
+  if (isFlightClosed(flight) && flight?.status === '正常') return '已结束'
+  return flight?.status || '未知'
+}
+
 const getStatusType = (status) => {
   if (status === '正常') return 'success'
   if (status === '延误') return 'warning'
   if (status === '取消') return 'danger'
+  if (status === '航班调整') return 'warning'
   if (status === '已完成') return 'info'
   return 'info'
 }
@@ -338,6 +384,7 @@ onMounted(() => {
 :deep(.el-table .cell) {
   line-height: 1.4;
 }
+
 .permission-alert {
   margin-bottom: 18px;
 }

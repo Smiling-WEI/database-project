@@ -14,7 +14,7 @@ def to_money(value):
 
 
 def get_hours_before_departure(flight_date):
-    """计算距离原航班起飞日期结束时刻的剩余小时数。"""
+    """按原航班日期计算距离起飞日前的剩余小时数。"""
     departure_datetime = datetime.combine(
         flight_date,
         time(23, 59, 59),
@@ -33,6 +33,7 @@ def find_active_airline_irregularity(cursor, instance_id):
         """
         SELECT
             irregularity_id,
+            irregularity_type,
             responsibility_type
         FROM flight_irregularity
         WHERE instance_id = %s
@@ -53,20 +54,22 @@ def determine_change_type(
     new_airline_id,
     irregularity,
 ):
-    """根据用户选择和航司归属确定实际适用的改签类型。"""
-    if requested_reason_type == "乘客主动改签":
+    """根据异常记录和新旧航司确定实际适用的改签类型。"""
+
+    # 核心修正：
+    # 只要原航班存在生效中的航司原因异常，不管前端是否显式传“航司原因”，
+    # 都自动按航司原因改签处理。
+    if irregularity is not None:
+        if old_airline_id == new_airline_id:
+            return "航司原因同航司改签", None
+
+        return "航司原因跨航司改签", None
+
+    # 没有异常时，才允许乘客主动改签。
+    if requested_reason_type in ("", None, "乘客主动改签"):
         return "乘客主动改签", None
 
-    if requested_reason_type != "航司原因":
-        return None, "改签原因类型不合法"
-
-    if irregularity is None:
-        return None, "原航班不存在生效中的航司原因异常记录"
-
-    if old_airline_id == new_airline_id:
-        return "航司原因同航司改签", None
-
-    return "航司原因跨航司改签", None
+    return None, "原航班不存在生效中的航司原因异常记录，不能按航司原因改签"
 
 
 def find_matching_change_rule(
@@ -122,12 +125,20 @@ def calculate_change_amounts(
     new_price = to_money(new_ticket_price)
     fare_difference = to_money(new_price - old_price)
 
+    # 航司原因同航司改签：
+    # 免手续费，且不补差价、不退差价。也就是免费安排到同航司替代航班。
     if change_type == "航司原因同航司改签":
         change_fee = to_money(0)
         payable_amount = to_money(0)
         refundable_amount = to_money(0)
 
     else:
+        # 乘客主动改签：
+        # 按规则收手续费，并根据规则处理正负差价。
+        #
+        # 航司原因跨航司改签：
+        # 对应规则应设置 fee_rate=0，charge_positive_difference=True，
+        # 即免手续费，但如果新票更贵，需要补正差价。
         change_fee = to_money(
             old_price * Decimal(str(rule["fee_rate"]))
         )

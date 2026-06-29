@@ -52,22 +52,17 @@
         <div class="header-left">
           <el-icon class="collapse-btn"><Fold /></el-icon>
           <span class="welcome-text">欢迎回来，{{ displayName }}</span>
-          <el-tag size="small" type="primary" effect="dark" class="vip-tag">
-            普通会员
-          </el-tag>
-        </div>
+</div>
 
         <div class="header-right">
-          <el-badge :value="2" class="msg-badge">
-            <el-icon :size="20"><Bell /></el-icon>
-          </el-badge>
-          <span class="message-text">消息</span>
+<span class="message-text">消息</span>
           <div class="user-profile">
             <el-avatar :size="32">
               <el-icon><UserFilled /></el-icon>
             </el-avatar>
             <span class="username">{{ displayName }}</span>
-            <el-icon><ArrowDown /></el-icon>
+            <el-icon>
+</el-icon>
           </div>
         </div>
       </el-header>
@@ -287,4 +282,19 @@ const handleLogout = () => {
   overflow-y: auto;
   background: rgba(255, 255, 255, 0.1);
 }
+
+
+/* final client cleanup */
+:deep(.message-text),
+:deep(.message-btn),
+:deep(.message-button),
+:deep(.header-message),
+:deep(.notice-entry),
+:deep(.notification-entry),
+:deep(.dropdown-arrow),
+:deep(.user-arrow),
+:deep(.el-icon--right) {
+  display: none !important;
+}
+
 </style>

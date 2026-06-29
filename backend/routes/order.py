@@ -497,12 +497,37 @@ def _load_refund_context(cursor, order_id, user_id, lock_rows=False):
     if order["order_status"] not in ("已支付", "已出票"):
         return None, "当前订单状态不允许退票", 409
 
+    cursor.execute(
+        """
+        SELECT
+            irregularity_id,
+            irregularity_type,
+            responsibility_type
+        FROM flight_irregularity
+        WHERE instance_id = %s
+          AND status = '生效中'
+        ORDER BY irregularity_id DESC
+        LIMIT 1
+        """,
+        (order["instance_id"],),
+    )
+
+    irregularity = cursor.fetchone()
+
+    refund_change_type = (
+        "航司原因退票"
+        if irregularity is not None
+        else "乘客主动退票"
+    )
+
     minutes_before_departure = order["minutes_before_departure"]
 
     if minutes_before_departure is None or minutes_before_departure < 0:
-        return None, "航班已起飞，不能退票", 409
-
-    hours_before_departure = Decimal(minutes_before_departure) / Decimal(60)
+        if irregularity is None:
+            return None, "航班已起飞，不能退票", 409
+        hours_before_departure = Decimal("0")
+    else:
+        hours_before_departure = Decimal(minutes_before_departure) / Decimal(60)
 
     cursor.execute(
         """
@@ -513,7 +538,7 @@ def _load_refund_context(cursor, order_id, user_id, lock_rows=False):
             max_hours_before_departure
         FROM change_rule
         WHERE airline_id = %s
-          AND change_type = '乘客主动退票'
+          AND change_type = %s
           AND status = '启用'
           AND min_hours_before_departure <= %s
           AND (
@@ -530,6 +555,7 @@ def _load_refund_context(cursor, order_id, user_id, lock_rows=False):
         """,
         (
             order["airline_id"],
+            refund_change_type,
             float(hours_before_departure),
             float(hours_before_departure),
         ),
@@ -559,6 +585,8 @@ def _load_refund_context(cursor, order_id, user_id, lock_rows=False):
             Decimal("0.01"),
             rounding=ROUND_HALF_UP,
         ),
+        "refund_change_type": refund_change_type,
+        "irregularity": irregularity,
     }, None, None
 
 
@@ -566,6 +594,12 @@ def _serialize_refund_context(context):
     """把退票预览结果转换为前端可用数据。"""
     order = context["order"]
     rule = context["rule"]
+    irregularity = context.get("irregularity")
+
+    if context["refund_change_type"] == "航司原因退票":
+        rule_text = "航班存在生效中异常，本次按航司原因退票处理，手续费为 0，全额退款"
+    else:
+        rule_text = f"退票手续费按票价的 {float(context['fee_rate']) * 100:.0f}% 收取"
 
     return {
         "orderId": order["order_id"],
@@ -577,9 +611,9 @@ def _serialize_refund_context(context):
         "refundableAmount": float(context["refundable_amount"]),
         "hoursBeforeDeparture": float(context["hours_before_departure"]),
         "ruleId": rule["rule_id"],
-        "ruleText": (
-            f"退票手续费按票价的 {float(context['fee_rate']) * 100:.0f}% 收取"
-        ),
+        "changeType": context["refund_change_type"],
+        "irregularityId": irregularity["irregularity_id"] if irregularity is not None else None,
+        "ruleText": rule_text,
     }
 
 
@@ -698,7 +732,7 @@ def refund_order(order_id):
                     completed_at
                 )
                 VALUES (
-                    %s, NULL, %s, '乘客主动退票', NULL,
+                    %s, NULL, %s, %s, %s,
                     %s, 0, %s, %s, 0, %s,
                     %s, %s, '已完成', NOW(), NOW()
                 )
@@ -706,6 +740,12 @@ def refund_order(order_id):
                 (
                     order["order_id"],
                     context["rule"]["rule_id"],
+                    context["refund_change_type"],
+                    (
+                        context["irregularity"]["irregularity_id"]
+                        if context.get("irregularity") is not None
+                        else None
+                    ),
                     context["ticket_price"],
                     -context["ticket_price"],
                     context["refund_fee"],

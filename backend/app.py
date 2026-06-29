@@ -15,6 +15,7 @@ from routes.admin_user import admin_user_bp
 from routes.admin_account import admin_account_bp
 from routes.change import change_bp
 from routes.flight_notice import flight_notice_bp
+from routes.admin_coordination import admin_coordination_bp
 
 
 app = Flask(__name__)
@@ -33,6 +34,7 @@ app.register_blueprint(admin_user_bp)
 app.register_blueprint(admin_account_bp)
 app.register_blueprint(change_bp)
 app.register_blueprint(flight_notice_bp)
+app.register_blueprint(admin_coordination_bp)
 
 
 @app.get("/api/health")

@@ -14,14 +14,10 @@
           <div class="profile-info">
             <div class="name-line">
               <h2>{{ userInfo.realName }}</h2>
-              <el-tag type="primary" effect="plain">普通会员</el-tag>
             </div>
             <p>会员ID：{{ userInfo.memberId }}</p>
             <p>注册时间：{{ userInfo.createdAt }}</p>
             <div class="growth-row">
-              <span>成长值：{{ userInfo.growth }} / 5000</span>
-              <el-progress :percentage="growthPercent" :show-text="false" />
-              <small>还需 {{ 5000 - userInfo.growth }} 成长值升级为银卡会员</small>
             </div>
           </div>
         </div>
@@ -180,11 +176,6 @@
               <span>密码强度</span>
               <strong :class="passwordStrength.level">{{ passwordStrength.text }}</strong>
             </div>
-            <el-progress
-              :percentage="passwordStrength.percent"
-              :show-text="false"
-              :class="['strength-progress', passwordStrength.level]"
-            />
             <small>密码长度不少于 8 位，组合越复杂越安全。</small>
           </div>
         </el-form-item>
@@ -356,7 +347,6 @@ const passwordStrength = computed(() => {
   }
 })
 
-const growthPercent = computed(() => Math.round((userInfo.growth / 5000) * 100))
 
 const completedFlightCount = computed(() => {
   return historyOrders.value.filter(order => {
@@ -1307,6 +1297,22 @@ onMounted(() => {
   margin-top: 6px;
   color: #64748b;
   line-height: 1.5;
+}
+
+
+
+/* final mine cleanup: hide growth and notification settings */
+:deep(.growth),
+:deep(.growth-value),
+:deep(.member-tag),
+:deep(.member-badge),
+:deep(.notification-settings),
+:deep(.notice-settings),
+:deep(.setting-card),
+:deep(.settings-card),
+:deep(.notice-card),
+:deep(.notification-card) {
+  display: none !important;
 }
 
 </style>

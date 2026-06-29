@@ -5,10 +5,10 @@
   >
     <template #extra>
       <el-button
-  type="primary"
-  :disabled="!canManageAdmins"
-  @click="handleAdd"
->
+        type="primary"
+        :disabled="!canManageAdmins"
+        @click="handleAdd"
+      >
         <el-icon><Plus /></el-icon>
         新增管理员
       </el-button>
@@ -40,10 +40,12 @@
             clearable
             style="width: 160px"
           >
-            <el-option label="航司主管理员" value="航司主管理员" />
-            <el-option label="航班管理员" value="航班管理员" />
-            <el-option label="订单管理员" value="订单管理员" />
-            <el-option label="客服管理员" value="客服管理员" />
+            <el-option
+              v-for="role in allAdminRoles"
+              :key="role"
+              :label="role"
+              :value="role"
+            />
           </el-select>
         </el-form-item>
 
@@ -70,14 +72,24 @@
       </el-form>
     </div>
 
-<el-alert
-  v-if="!canManageAdmins"
-  title="当前岗位仅可查看管理员信息，无权新增、编辑、启用、禁用或重置管理员密码"
-  type="info"
-  :closable="false"
-  show-icon
-  class="permission-alert"
-/>
+    <el-alert
+      v-if="!canManageAdmins"
+      title="当前岗位仅可查看管理员信息，无权新增、编辑、启用、禁用或重置管理员密码"
+      type="info"
+      :closable="false"
+      show-icon
+      class="permission-alert"
+    />
+
+    <el-alert
+      v-else-if="!systemAdmin"
+      title="航司主管理员只能新增本航司下级管理员，不能新增新的航司主管理员。"
+      type="info"
+      :closable="false"
+      show-icon
+      class="permission-alert"
+    />
+
     <div class="table-card">
       <el-table
         :data="pagedAdmins"
@@ -88,12 +100,15 @@
         empty-text="暂无管理员数据"
       >
         <el-table-column prop="adminId" label="账号ID" width="90" />
+
         <el-table-column
           v-if="systemAdmin"
           prop="airlineName"
           label="航空公司"
           min-width="145"
+          show-overflow-tooltip
         />
+
         <el-table-column prop="name" label="管理员名" width="150" show-overflow-tooltip />
         <el-table-column prop="account" label="登录账号" width="170" show-overflow-tooltip />
         <el-table-column prop="phone" label="手机号" width="135" />
@@ -112,12 +127,6 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="最近登录" width="175" show-overflow-tooltip>
-          <template #default="{ row }">
-            {{ formatValue(row.lastLoginTime) }}
-          </template>
-        </el-table-column>
-
         <el-table-column label="账号状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">
@@ -127,46 +136,46 @@
         </el-table-column>
 
         <el-table-column label="操作" fixed="right" width="245">
-  <template #default="{ row }">
-    <el-button
-      type="primary"
-      link
-      :disabled="!canManageAdmins"
-      @click="handleEdit(row)"
-    >
-      编辑
-    </el-button>
+          <template #default="{ row }">
+            <el-button
+              type="primary"
+              link
+              :disabled="!canManageAdmins"
+              @click="handleEdit(row)"
+            >
+              编辑
+            </el-button>
 
-    <el-button
-      v-if="row.status === '正常'"
-      type="danger"
-      link
-      :disabled="!canManageAdmins"
-      @click="handleDisable(row)"
-    >
-      禁用
-    </el-button>
+            <el-button
+              v-if="row.status === '正常'"
+              type="danger"
+              link
+              :disabled="!canManageAdmins || row.adminId === currentUser?.user_id"
+              @click="handleDisable(row)"
+            >
+              禁用
+            </el-button>
 
-    <el-button
-      v-else
-      type="success"
-      link
-      :disabled="!canManageAdmins"
-      @click="handleEnable(row)"
-    >
-      启用
-    </el-button>
+            <el-button
+              v-else
+              type="success"
+              link
+              :disabled="!canManageAdmins"
+              @click="handleEnable(row)"
+            >
+              启用
+            </el-button>
 
-    <el-button
-      type="info"
-      link
-      :disabled="!canManageAdmins"
-      @click="handleResetPassword(row)"
-    >
-      重置密码
-    </el-button>
-  </template>
-</el-table-column>
+            <el-button
+              type="info"
+              link
+              :disabled="!canManageAdmins"
+              @click="handleResetPassword(row)"
+            >
+              重置密码
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <div class="pagination-wrap">
@@ -233,10 +242,12 @@
             placeholder="请选择角色"
             style="width: 100%"
           >
-            <el-option label="航司主管理员" value="航司主管理员" />
-            <el-option label="航班管理员" value="航班管理员" />
-            <el-option label="订单管理员" value="订单管理员" />
-            <el-option label="客服管理员" value="客服管理员" />
+            <el-option
+              v-for="role in selectableAdminRoles"
+              :key="role"
+              :label="role"
+              :value="role"
+            />
           </el-select>
         </el-form-item>
 
@@ -306,6 +317,21 @@ const adminList = ref([])
 const selectedAirlineId = ref('')
 const currentUser = computed(() => getStoredUser())
 const systemAdmin = computed(() => isSystemAdmin(currentUser.value))
+
+const allAdminRoles = [
+  '航司主管理员',
+  '订单管理员',
+  '航班管理员'
+]
+
+const subordinateAdminRoles = [
+  '订单管理员',
+  '航班管理员'
+]
+
+const selectableAdminRoles = computed(() => {
+  return systemAdmin.value ? allAdminRoles : subordinateAdminRoles
+})
 
 const canManageAdmins = computed(() => {
   return canEditAdmins(currentUser.value)
@@ -402,11 +428,12 @@ const resetForm = () => {
   adminForm.idCard = ''
   adminForm.phone = ''
   adminForm.email = ''
-  adminForm.role = ''
+  adminForm.role = systemAdmin.value ? '航司主管理员' : '航班管理员'
   adminForm.status = '正常'
   adminForm.password = ''
   adminForm.airlineId = ''
   editingAdminId.value = null
+  formRef.value?.clearValidate()
 }
 
 const handleSearch = () => {
@@ -425,6 +452,7 @@ const handleAdd = () => {
     ElMessage.warning('请先选择需要新增管理员的航空公司')
     return
   }
+
   isEdit.value = false
   resetForm()
   adminForm.airlineId = selectedAirlineId.value
@@ -452,6 +480,11 @@ const handleSubmit = async () => {
   try {
     await formRef.value.validate()
 
+    if (!systemAdmin.value && adminForm.role === '航司主管理员') {
+      ElMessage.warning('航司主管理员不能新增或设置新的航司主管理员')
+      return
+    }
+
     const payload = {
       name: adminForm.name,
       account: adminForm.account,
@@ -477,9 +510,7 @@ const handleSubmit = async () => {
     dialogVisible.value = false
     await loadAdmins()
   } catch (error) {
-    if (!error?.response) {
-      return
-    }
+    if (!error?.response) return
 
     ElMessage.error(error.response?.data?.message || '管理员信息保存失败')
     console.error(error)
@@ -505,9 +536,7 @@ const updateAdminStatus = async (row, status) => {
     ElMessage.success(`管理员账号已${status === '禁用' ? '禁用' : '启用'}`)
     await loadAdmins()
   } catch (error) {
-    if (error === 'cancel' || error === 'close') {
-      return
-    }
+    if (error === 'cancel' || error === 'close') return
 
     ElMessage.error(error.response?.data?.message || '账号状态修改失败')
     console.error(error)
@@ -542,9 +571,7 @@ const handleResetPassword = async (row) => {
 
     ElMessage.success('管理员密码已重置')
   } catch (error) {
-    if (error === 'cancel' || error === 'close') {
-      return
-    }
+    if (error === 'cancel' || error === 'close') return
 
     ElMessage.error(error.response?.data?.message || '密码重置失败')
     console.error(error)
@@ -552,10 +579,7 @@ const handleResetPassword = async (row) => {
 }
 
 const formatValue = (value) => {
-  if (value === undefined || value === null || value === '') {
-    return '-'
-  }
-
+  if (value === undefined || value === null || value === '') return '-'
   return value
 }
 
@@ -563,7 +587,7 @@ const getRoleType = (role) => {
   if (role === '航司主管理员') return 'danger'
   if (role === '航班管理员') return 'primary'
   if (role === '订单管理员') return 'success'
-  if (role === '客服管理员') return 'warning'
+  
   return 'info'
 }
 
@@ -595,6 +619,10 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
 }
 
+.permission-alert {
+  margin-bottom: 18px;
+}
+
 .table-card {
   padding: 18px;
   border-radius: 16px;
@@ -623,12 +651,5 @@ onMounted(() => {
   background: #f8fafc;
   color: #334155;
   font-weight: 600;
-}
-
-:deep(.el-table .cell) {
-  line-height: 1.4;
-}
-.permission-alert {
-  margin-bottom: 18px;
 }
 </style>

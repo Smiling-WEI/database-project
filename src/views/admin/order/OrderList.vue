@@ -347,6 +347,7 @@
             v-model="assistForm.targetInstanceId"
             filterable
             placeholder="请选择目标航班"
+            @change="handleTargetFlightChange"
             style="width: 100%"
           >
             <el-option
@@ -354,6 +355,28 @@
               :key="flight.instanceId"
               :label="`${flight.airlineName || ''} · ${flight.flightNo} · ${flight.flightDate} · ${flight.depAirport} → ${flight.arrAirport}`"
               :value="flight.instanceId"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item
+          v-if="assistType === 'change'"
+          label="目标舱位"
+          required
+        >
+          <el-select
+            v-model="assistForm.targetPricingId"
+            filterable
+            :disabled="!assistForm.targetInstanceId"
+            :loading="loadingTargetCabins"
+            placeholder="请先选择目标航班，再选择目标舱位"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="cabin in targetCabins"
+              :key="cabin.pricingId"
+              :label="`${cabin.cabinType} · ¥${cabin.salePrice} · 剩余${cabin.remainingTickets ?? cabin.availableTickets ?? '-'}张`"
+              :value="cabin.pricingId"
             />
           </el-select>
         </el-form-item>
@@ -431,6 +454,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import api from '../../../api'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/admin/PageContainer.vue'
@@ -485,6 +509,8 @@ const assistPreview = ref(null)
 const previewing = ref(false)
 const submittingAssist = ref(false)
 const availableFlights = ref([])
+const targetCabins = ref([])
+const loadingTargetCabins = ref(false)
 const selectedAirlineId = ref(route.query.airlineId || '')
 const loading = ref(false)
 const orderList = ref([])
@@ -503,6 +529,7 @@ const ordersWithPhone = computed(() => {
 
 const assistForm = reactive({
   targetInstanceId: null,
+  targetPricingId: null,
   reason: ''
 })
 
@@ -632,8 +659,25 @@ const handleView = (row) => {
 }
 
 const canProcess = (row) => {
-  return row.orderStatus === '已支付' && row.recordType === '有效订单'
+  const orderStatus = String(row.orderStatus || '').trim()
+  const recordType = String(row.recordType || '').trim()
+
+  const activeStatuses = [
+    '已支付',
+    '已出票',
+    '宸叉敮浠?',
+    '宸插嚭绁?'
+  ]
+
+  const activeRecordTypes = [
+    '有效订单',
+    '鏈夋晥璁㈠崟'
+  ]
+
+  return activeStatuses.includes(orderStatus) &&
+    activeRecordTypes.includes(recordType)
 }
+
 
 const handleAssist = (row, type) => {
   if (!canAssist.value || !canProcess(row)) return
@@ -646,7 +690,9 @@ const handleAssist = (row, type) => {
 
 const resetAssistForm = () => {
   assistForm.targetInstanceId = null
+  assistForm.targetPricingId = null
   assistForm.reason = ''
+  targetCabins.value = []
   assistPreview.value = null
 }
 
@@ -664,6 +710,99 @@ const loadAvailableFlights = async () => {
   }
 }
 
+const handleTargetFlightChange = async () => {
+  assistForm.targetPricingId = null
+  assistPreview.value = null
+  targetCabins.value = []
+
+  if (!assistForm.targetInstanceId) return
+
+  await loadTargetCabins(assistForm.targetInstanceId)
+}
+
+const normalizeCabinPricing = (item) => {
+  return {
+    ...item,
+    pricingId:
+      item.pricingId ??
+      item.pricing_id ??
+      item.priceId ??
+      item.price_id ??
+      item.cabinPricingId ??
+      item.cabin_pricing_id ??
+      item.id,
+    cabinType:
+      item.cabinType ??
+      item.cabin_type ??
+      item.cabin ??
+      item.type,
+    salePrice:
+      item.salePrice ??
+      item.sale_price ??
+      item.price ??
+      item.ticketPrice ??
+      item.ticket_price,
+    remainingTickets:
+      item.remainingTickets ??
+      item.remaining_tickets ??
+      item.availableTickets ??
+      item.available_tickets ??
+      item.remainingSeats ??
+      item.remaining_seats ??
+      item.leftTickets ??
+      item.left_tickets ??
+      '-'
+  }
+}
+
+const loadTargetCabins = async (instanceId) => {
+  loadingTargetCabins.value = true
+
+  try {
+    const response = await api.get(`/admin/flights/${instanceId}/cabins`)
+
+    const data = response.data?.data ?? []
+
+    let raw = []
+
+    if (Array.isArray(data)) {
+      raw = data
+    } else if (Array.isArray(data.records)) {
+      raw = data.records
+    } else if (Array.isArray(data.list)) {
+      raw = data.list
+    } else if (Array.isArray(data.items)) {
+      raw = data.items
+    } else if (Array.isArray(data.cabins)) {
+      raw = data.cabins
+    } else if (Array.isArray(data.prices)) {
+      raw = data.prices
+    } else if (Array.isArray(data.priceList)) {
+      raw = data.priceList
+    } else if (Array.isArray(data.pricingList)) {
+      raw = data.pricingList
+    } else if (Array.isArray(data.cabinPrices)) {
+      raw = data.cabinPrices
+    } else if (data && typeof data === 'object') {
+      raw = Object.values(data).find((value) => Array.isArray(value)) || []
+    }
+
+    targetCabins.value = raw
+      .map(normalizeCabinPricing)
+      .filter((item) => item.pricingId && item.cabinType)
+
+    if (targetCabins.value.length === 0) {
+      ElMessage.warning('该目标航班暂无舱位票价，请先到舱位票价页面配置')
+    }
+  } catch (error) {
+    targetCabins.value = []
+    console.error('目标舱位票价加载失败：', error)
+    ElMessage.error(error.response?.data?.message || error.message || '目标舱位票价加载失败')
+  } finally {
+    loadingTargetCabins.value = false
+  }
+}
+
 const validateAssist = () => {
   if (!assistForm.reason.trim()) {
     ElMessage.warning(`请填写${assistType.value === 'refund' ? '退票' : '改签'}原因`)
@@ -673,6 +812,12 @@ const validateAssist = () => {
     ElMessage.warning('请选择目标航班')
     return false
   }
+
+  if (assistType.value === 'change' && !assistForm.targetPricingId) {
+    ElMessage.warning('请选择目标舱位')
+    return false
+  }
+
   return true
 }
 
@@ -683,6 +828,9 @@ const handlePreview = async () => {
     const payload = {
       reason: assistForm.reason.trim(),
       target_instance_id: assistForm.targetInstanceId || undefined,
+      new_pricing_id: assistForm.targetPricingId || undefined,
+      target_pricing_id: assistForm.targetPricingId || undefined,
+      new_cabin_pricing_id: assistForm.targetPricingId || undefined,
       operator_type: '客服代操作',
       irregularity_id: route.query.irregularityId || undefined
     }
@@ -705,6 +853,9 @@ const handleAssistSubmit = async () => {
     const payload = {
       reason: assistForm.reason.trim(),
       target_instance_id: assistForm.targetInstanceId || undefined,
+      new_pricing_id: assistForm.targetPricingId || undefined,
+      target_pricing_id: assistForm.targetPricingId || undefined,
+      new_cabin_pricing_id: assistForm.targetPricingId || undefined,
       preview_token: assistPreview.value.previewToken,
       operator_type: '客服代操作',
       irregularity_id: route.query.irregularityId || undefined

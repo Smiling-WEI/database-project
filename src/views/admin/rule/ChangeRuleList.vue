@@ -1,17 +1,16 @@
 <template>
   <PageContainer
-    title="退改签规则管理"
+    title="票务配置 / 退改签规则"
     description="统一维护退票与改签的时间区间、手续费比例和费用处理策略"
   >
     <template #extra>
       <el-button
-        v-if="activeRuleTab === 'change'"
         type="primary"
         :disabled="!canEditRules || (systemAdmin && !selectedAirlineId)"
         @click="handleAdd"
       >
         <el-icon><Plus /></el-icon>
-        新增规则
+        {{ activeRuleTab === 'refund' ? '新增退票规则' : '新增改签规则' }}
       </el-button>
     </template>
 
@@ -24,23 +23,26 @@
       </el-form>
     </div>
 
-    <el-tabs v-model="activeRuleTab" class="rule-tabs">
-      <el-tab-pane label="退票规则" name="refund" lazy>
-        <RefundRulePanel :airline-id="selectedAirlineId" />
-      </el-tab-pane>
+    <el-tabs
+      v-model="activeRuleTab"
+      class="rule-tabs"
+      @tab-change="handleTabChange"
+    >
+      <el-tab-pane label="退票规则" name="refund" />
+      <el-tab-pane label="改签规则" name="change" />
+    </el-tabs>
 
-      <el-tab-pane label="改签规则" name="change">
-        <div class="filter-card">
-      <el-form :model="queryForm" inline label-width="80px">
-        <el-form-item label="改签类型">
+    <div class="filter-card">
+      <el-form :model="queryForm" inline label-width="90px">
+        <el-form-item :label="activeRuleTab === 'refund' ? '退票类型' : '改签类型'">
           <el-select
             v-model="queryForm.changeType"
-            placeholder="请选择改签类型"
+            :placeholder="activeRuleTab === 'refund' ? '请选择退票类型' : '请选择改签类型'"
             clearable
             style="width: 220px"
           >
             <el-option
-              v-for="type in changeTypes"
+              v-for="type in currentRuleTypes"
               :key="type"
               :label="type"
               :value="type"
@@ -65,18 +67,20 @@
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
-        </div>
+    </div>
 
-        <el-alert
-          v-if="!canEditRules"
-          title="当前岗位仅可查看改签规则，无权新增或修改规则"
-          type="info"
-          :closable="false"
-          show-icon
-          class="permission-alert"
-        />
+    <el-alert
+      v-if="!canEditRules"
+      :title="activeRuleTab === 'refund'
+        ? '当前岗位仅可查看退票规则，无权新增或修改规则'
+        : '当前岗位仅可查看改签规则，无权新增或修改规则'"
+      type="info"
+      :closable="false"
+      show-icon
+      class="permission-alert"
+    />
 
-        <div class="table-card">
+    <div class="table-card">
       <el-table
         v-loading="loading"
         :data="pagedRules"
@@ -84,40 +88,69 @@
         border
         table-layout="fixed"
         style="width: 100%"
-        empty-text="暂无改签规则"
+        :empty-text="activeRuleTab === 'refund' ? '暂无退票规则' : '暂无改签规则'"
       >
         <el-table-column prop="ruleId" label="规则ID" width="90" />
-        <el-table-column prop="changeType" label="改签类型" min-width="190" />
+        <el-table-column
+          prop="changeType"
+          :label="activeRuleTab === 'refund' ? '退票类型' : '改签类型'"
+          min-width="190"
+        />
+
         <el-table-column label="起飞前时间区间" width="170">
           <template #default="{ row }">
             {{ formatHourRange(row) }}
           </template>
         </el-table-column>
+
         <el-table-column label="手续费比例" width="120">
           <template #default="{ row }">
             {{ formatPercent(row.feeRate) }}
           </template>
         </el-table-column>
-        <el-table-column label="补收正差价" width="120">
+
+        <el-table-column
+          v-if="activeRuleTab === 'refund'"
+          label="退款处理"
+          min-width="190"
+        >
+          <template #default="{ row }">
+            {{ Number(row.feeRate || 0) === 0 ? '全额退款' : '扣除手续费后退款' }}
+          </template>
+        </el-table-column>
+
+        <el-table-column
+          v-if="activeRuleTab === 'change'"
+          label="补收正差价"
+          width="120"
+        >
           <template #default="{ row }">
             <el-tag :type="row.chargePositiveDifference ? 'success' : 'info'">
               {{ row.chargePositiveDifference ? '是' : '否' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="退还负差价" width="120">
+
+        <el-table-column
+          v-if="activeRuleTab === 'change'"
+          label="退还负差价"
+          width="120"
+        >
           <template #default="{ row }">
             <el-tag :type="row.refundNegativeDifference ? 'success' : 'info'">
               {{ row.refundNegativeDifference ? '是' : '否' }}
             </el-tag>
           </template>
         </el-table-column>
+
         <el-table-column prop="validFrom" label="生效时间" min-width="175" />
+
         <el-table-column label="失效时间" min-width="175">
           <template #default="{ row }">
             {{ row.validTo || '长期有效' }}
           </template>
         </el-table-column>
+
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === '启用' ? 'success' : 'info'">
@@ -125,6 +158,7 @@
             </el-tag>
           </template>
         </el-table-column>
+
         <el-table-column label="操作" fixed="right" width="100">
           <template #default="{ row }">
             <el-button
@@ -148,13 +182,11 @@
           :total="filteredRules.length"
         />
       </div>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
+    </div>
 
     <el-dialog
       v-model="dialogVisible"
-      :title="isEdit ? '修改改签规则' : '新增改签规则'"
+      :title="dialogTitle"
       width="660px"
       @closed="resetForm"
     >
@@ -164,14 +196,14 @@
         :rules="rules"
         label-width="130px"
       >
-        <el-form-item label="改签类型" prop="changeType">
+        <el-form-item :label="activeRuleTab === 'refund' ? '退票类型' : '改签类型'" prop="changeType">
           <el-select
             v-model="ruleForm.changeType"
-            placeholder="请选择改签类型"
+            :placeholder="activeRuleTab === 'refund' ? '请选择退票类型' : '请选择改签类型'"
             style="width: 100%"
           >
             <el-option
-              v-for="type in changeTypes"
+              v-for="type in currentRuleTypes"
               :key="type"
               :label="type"
               :value="type"
@@ -191,6 +223,7 @@
               />
             </el-form-item>
           </el-col>
+
           <el-col :span="12">
             <el-form-item label="时间上限">
               <el-input-number
@@ -207,6 +240,7 @@
 
         <el-form-item label="不设时间上限">
           <el-switch v-model="ruleForm.noUpperLimit" />
+          <span class="form-help">例如“48 小时以上”</span>
         </el-form-item>
 
         <el-form-item label="手续费比例" prop="feeRatePercent">
@@ -219,21 +253,31 @@
             controls-position="right"
             style="width: 100%"
           />
-          <span class="form-help">按原票价百分比计算</span>
+          <span class="form-help">按原票价百分比计算，例如 10 表示 10%</span>
         </el-form-item>
 
-        <el-row :gutter="16">
+        <el-row v-if="activeRuleTab === 'change'" :gutter="16">
           <el-col :span="12">
             <el-form-item label="补收正差价">
               <el-switch v-model="ruleForm.chargePositiveDifference" />
             </el-form-item>
           </el-col>
+
           <el-col :span="12">
             <el-form-item label="退还负差价">
               <el-switch v-model="ruleForm.refundNegativeDifference" />
             </el-form-item>
           </el-col>
         </el-row>
+
+        <el-alert
+          v-if="activeRuleTab === 'refund'"
+          title="退票规则只计算退票手续费与退款金额，不需要设置补收或退还差价。"
+          type="info"
+          :closable="false"
+          show-icon
+          class="dialog-alert"
+        />
 
         <el-form-item label="规则状态" prop="status">
           <el-radio-group v-model="ruleForm.status">
@@ -260,7 +304,7 @@
 
         <el-alert
           v-else
-          title="现有接口支持修改规则内容和状态，规则有效日期保持原记录不变"
+          title="编辑时保留原规则有效期，只修改规则内容和状态。"
           type="info"
           :closable="false"
           show-icon
@@ -287,7 +331,6 @@ import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import PageContainer from '../../../components/admin/PageContainer.vue'
 import AirlineScopeSelect from '../../../components/admin/AirlineScopeSelect.vue'
-import RefundRulePanel from '../../../components/admin/rule/RefundRulePanel.vue'
 import {
   createChangeRule,
   getChangeRules,
@@ -301,7 +344,7 @@ import {
 } from '../../../utils/adminAuth'
 
 const formRef = ref()
-const activeRuleTab = ref('change')
+const activeRuleTab = ref('refund')
 const selectedAirlineId = ref('')
 const loading = ref(false)
 const submitting = ref(false)
@@ -309,6 +352,11 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingRuleId = ref(null)
 const ruleList = ref([])
+
+const refundTypes = [
+  '乘客主动退票',
+  '航司原因退票'
+]
 
 const changeTypes = [
   '乘客主动改签',
@@ -342,9 +390,21 @@ const currentUser = computed(() => getStoredUser())
 const systemAdmin = computed(() => isSystemAdmin(currentUser.value))
 const canEditRules = computed(() => canManageChangeRules(currentUser.value))
 
+const currentRuleTypes = computed(() => {
+  return activeRuleTab.value === 'refund' ? refundTypes : changeTypes
+})
+
+const dialogTitle = computed(() => {
+  if (activeRuleTab.value === 'refund') {
+    return isEdit.value ? '修改退票规则' : '新增退票规则'
+  }
+
+  return isEdit.value ? '修改改签规则' : '新增改签规则'
+})
+
 const rules = {
   changeType: [
-    { required: true, message: '请选择改签类型', trigger: 'change' }
+    { required: true, message: '请选择规则类型', trigger: 'change' }
   ],
   minHours: [
     { required: true, message: '请输入时间下限', trigger: 'blur' }
@@ -362,6 +422,11 @@ const rules = {
 
 const filteredRules = computed(() => {
   return ruleList.value.filter((item) => {
+    const belongsToCurrentTab =
+      activeRuleTab.value === 'refund'
+        ? String(item.changeType || '').includes('退票')
+        : String(item.changeType || '').includes('改签')
+
     const matchType =
       !queryForm.changeType ||
       item.changeType === queryForm.changeType
@@ -370,7 +435,7 @@ const filteredRules = computed(() => {
       !queryForm.status ||
       item.status === queryForm.status
 
-    return matchType && matchStatus
+    return belongsToCurrentTab && matchType && matchStatus
   })
 })
 
@@ -388,7 +453,7 @@ const loadRules = async () => {
     )
     ruleList.value = response.data.data || []
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '改签规则加载失败')
+    ElMessage.error(error.response?.data?.message || '退改签规则加载失败')
     console.error(error)
   } finally {
     loading.value = false
@@ -398,6 +463,10 @@ const loadRules = async () => {
 const handleAirlineChange = () => {
   pagination.currentPage = 1
   loadRules()
+}
+
+const handleTabChange = () => {
+  handleReset()
 }
 
 const handleSearch = () => {
@@ -411,13 +480,15 @@ const handleReset = () => {
 }
 
 const resetForm = () => {
-  ruleForm.changeType = ''
+  ruleForm.changeType = activeRuleTab.value === 'refund'
+    ? '乘客主动退票'
+    : '乘客主动改签'
   ruleForm.minHours = 0
   ruleForm.maxHours = 24
   ruleForm.noUpperLimit = false
   ruleForm.feeRatePercent = 0
-  ruleForm.chargePositiveDifference = true
-  ruleForm.refundNegativeDifference = false
+  ruleForm.chargePositiveDifference = activeRuleTab.value !== 'refund'
+  ruleForm.refundNegativeDifference = activeRuleTab.value === 'refund'
   ruleForm.status = '启用'
   ruleForm.validRange = []
   editingRuleId.value = null
@@ -449,7 +520,6 @@ const handleSubmit = async () => {
   if (!canEditRules.value || !formRef.value) return
 
   const valid = await formRef.value.validate().catch(() => false)
-
   if (!valid) return
 
   if (
@@ -468,8 +538,12 @@ const handleSubmit = async () => {
       ? null
       : ruleForm.maxHours,
     fee_rate: Number((ruleForm.feeRatePercent / 100).toFixed(4)),
-    charge_positive_difference: ruleForm.chargePositiveDifference,
-    refund_negative_difference: ruleForm.refundNegativeDifference,
+    charge_positive_difference: activeRuleTab.value === 'refund'
+      ? false
+      : ruleForm.chargePositiveDifference,
+    refund_negative_difference: activeRuleTab.value === 'refund'
+      ? true
+      : ruleForm.refundNegativeDifference,
     status: ruleForm.status
   }
 
@@ -483,16 +557,16 @@ const handleSubmit = async () => {
   try {
     if (isEdit.value) {
       await updateChangeRule(editingRuleId.value, payload)
-      ElMessage.success('改签规则已修改')
+      ElMessage.success(activeRuleTab.value === 'refund' ? '退票规则已修改' : '改签规则已修改')
     } else {
       await createChangeRule(payload)
-      ElMessage.success('改签规则已新增')
+      ElMessage.success(activeRuleTab.value === 'refund' ? '退票规则已新增' : '改签规则已新增')
     }
 
     dialogVisible.value = false
     await loadRules()
   } catch (error) {
-    ElMessage.error(error.response?.data?.message || '改签规则保存失败')
+    ElMessage.error(error.response?.data?.message || '退改签规则保存失败')
     console.error(error)
   } finally {
     submitting.value = false
@@ -525,20 +599,16 @@ onMounted(() => {
   border: 1px solid #e2e8f0;
 }
 
-.permission-alert {
-  margin-bottom: 18px;
-}
-
-.rule-tabs {
-  padding: 0 4px;
-}
-
 .scope-card {
   margin-bottom: 18px;
   padding: 18px 18px 0;
   border-radius: 16px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
+}
+
+.rule-tabs {
+  margin-bottom: 12px;
 }
 
 .table-card {
@@ -556,9 +626,17 @@ onMounted(() => {
   justify-content: flex-end;
 }
 
+.permission-alert {
+  margin-bottom: 18px;
+}
+
+.dialog-alert {
+  margin-bottom: 18px;
+}
+
 .form-help {
   margin-left: 10px;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 12px;
 }
 
@@ -575,5 +653,9 @@ onMounted(() => {
   background: #f8fafc;
   color: #334155;
   font-weight: 600;
+}
+
+:deep(.el-table .cell) {
+  line-height: 1.4;
 }
 </style>

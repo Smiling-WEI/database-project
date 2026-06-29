@@ -160,7 +160,7 @@
           </div>
 
           <div class="action-block">
-            <el-button
+            <el-button :disabled="!canCheckinAvailable(order)"
               v-if="activeTab === 'active' && !order.seatNo"
               type="primary"
               @click="handleCheckin(order)"
@@ -194,7 +194,7 @@
         <span class="blue-line"></span>
         <span>温馨提示</span>
       </div>
-      <p>1. 航班起飞前 48 小时内可办理值机，起飞前 2 小时停止办理。</p>
+      <p>1. 航班起飞前 24 小时内可办理值机，起飞前 2 小时停止办理。</p>
       <p>2. 如需改签或退票，请提前查看航空公司退改签规则。</p>
       <p>3. 已值机订单如需变更座位，请在航班起飞前通过“值机选座”重新选择。</p>
     </section>
@@ -443,6 +443,55 @@ const maskIdCard = (idCard) => {
 onMounted(() => {
   loadOrders()
 })
+
+
+const parseOrderDepartureTime = (order) => {
+  const full =
+    order.depDateTime ||
+    order.dep_time ||
+    order.depTimeFull ||
+    order.departureTimeFull
+
+  if (full && String(full).includes('-') && String(full).includes(':')) {
+    return new Date(String(full).replace(/-/g, '/').replace('T', ' '))
+  }
+
+  const date =
+    order.flightDate ||
+    order.flight_date ||
+    order.departureDate ||
+    order.depDate
+
+  const time =
+    order.depTime ||
+    order.dep_time_text ||
+    order.departureTime ||
+    order.dep_time ||
+    '00:00'
+
+  if (!date) return null
+
+  return new Date(`${String(date).replace(/-/g, '/')} ${String(time).slice(0, 5)}:00`)
+}
+
+const canCheckinAvailable = (order) => {
+  if (!order) return false
+  if (order.seatNo || order.seat_no) return false
+
+  const status = order.orderStatus || order.order_status || ''
+  if (!['已支付', '已出票', '待值机'].includes(status)) {
+    return false
+  }
+
+  const dep = parseOrderDepartureTime(order)
+  if (!dep || Number.isNaN(dep.getTime())) return false
+
+  const minutes = (dep.getTime() - Date.now()) / 60000
+
+  // 只能在起飞前 24 小时内办理，起飞前 2 小时停止办理
+  return minutes <= 24 * 60 && minutes >= 2 * 60
+}
+
 </script>
 
 <style scoped>

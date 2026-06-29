@@ -13,24 +13,51 @@ admin_user_bp = Blueprint(
 
 
 @admin_user_bp.get("/users")
-@role_required("航空公司管理员")
+@role_required("航司管理员", "航空公司管理员", "航司内部管理员", "系统总管理员", "平台总管理员", "总管理员")
 def list_managed_users():
-    """查询与当前航空公司产生过订单关系的普通用户。"""
     name = str(request.args.get("name", "")).strip()
     phone = str(request.args.get("phone", "")).strip()
     status = str(request.args.get("status", "")).strip()
 
     conditions = [
-        "u.role = '乘客'",
-        "fni.airline_id = %s",
+        "u.role = '乘客'"
     ]
 
-    parameters = [
-        g.current_user["airline_id"],
-    ]
+    parameters = []
+
+    is_system_admin = (
+        g.current_user.get("role") in ("系统总管理员", "平台总管理员", "总管理员")
+        or g.current_user.get("admin_role") in ("系统总管理员", "平台总管理员", "总管理员")
+    )
+
+    if not is_system_admin:
+        airline_id = g.current_user.get("airline_id")
+
+        if airline_id is None:
+            return error_response("当前管理员未绑定航空公司", 403)
+
+        conditions.append(
+            """
+            EXISTS (
+                SELECT 1
+                FROM (
+                    SELECT user_id, instance_id FROM active_ticket_sale
+                    UNION ALL
+                    SELECT user_id, instance_id FROM archive_ticket_sale
+                ) AS user_orders
+                JOIN flight_instance AS fi
+                  ON fi.instance_id = user_orders.instance_id
+                JOIN flight_no_info AS fni
+                  ON fni.flight_no = fi.flight_no
+                WHERE user_orders.user_id = u.user_id
+                  AND fni.airline_id = %s
+            )
+            """
+        )
+        parameters.append(airline_id)
 
     if name:
-        conditions.append("(u.username LIKE %s OR u.real_name LIKE %s)")
+        conditions.append("(u.real_name LIKE %s OR u.username LIKE %s)")
         keyword = f"%{name}%"
         parameters.extend([keyword, keyword])
 
@@ -61,28 +88,16 @@ def list_managed_users():
                     u.status,
                     u.created_at,
                     COUNT(DISTINCT up.passenger_id) AS passenger_count,
-                    COUNT(DISTINCT orders.order_id) AS order_count
+                    (
+                        SELECT COUNT(*)
+                        FROM (
+                            SELECT user_id FROM active_ticket_sale
+                            UNION ALL
+                            SELECT user_id FROM archive_ticket_sale
+                        ) AS all_orders
+                        WHERE all_orders.user_id = u.user_id
+                    ) AS order_count
                 FROM `user` AS u
-                JOIN (
-                    SELECT
-                        order_id,
-                        user_id,
-                        instance_id
-                    FROM active_ticket_sale
-
-                    UNION ALL
-
-                    SELECT
-                        order_id,
-                        user_id,
-                        instance_id
-                    FROM archive_ticket_sale
-                ) AS orders
-                  ON orders.user_id = u.user_id
-                JOIN flight_instance AS fi
-                  ON fi.instance_id = orders.instance_id
-                JOIN flight_no_info AS fni
-                  ON fni.flight_no = fi.flight_no
                 LEFT JOIN user_passenger AS up
                   ON up.user_id = u.user_id
                 WHERE {where_clause}
@@ -101,23 +116,27 @@ def list_managed_users():
 
             rows = cursor.fetchall()
 
-        users = [
-            {
-                "userId": row["user_id"],
-                "username": row["username"],
-                "realName": row["real_name"],
-                "phone": row["phone"],
-                "email": row["email"],
-                "status": row["status"],
-                "passengerCount": row["passenger_count"],
-                "orderCount": row["order_count"],
-                "createdAt": row["created_at"].isoformat(
-                    sep=" ",
-                    timespec="seconds",
-                ),
-            }
-            for row in rows
-        ]
+        users = []
+
+        for row in rows:
+            users.append(
+                {
+                    "userId": row["user_id"],
+                    "user_id": row["user_id"],
+                    "username": row["username"],
+                    "realName": row["real_name"],
+                    "real_name": row["real_name"],
+                    "phone": row["phone"],
+                    "email": row["email"],
+                    "status": row["status"],
+                    "createdAt": row["created_at"].isoformat(sep=" ", timespec="seconds"),
+                    "created_at": row["created_at"].isoformat(sep=" ", timespec="seconds"),
+                    "passengerCount": row["passenger_count"],
+                    "passenger_count": row["passenger_count"],
+                    "orderCount": row["order_count"],
+                    "order_count": row["order_count"],
+                }
+            )
 
         return success_response(users, "查询成功")
 
@@ -128,8 +147,9 @@ def list_managed_users():
         if connection is not None:
             connection.close()
 
+
 @admin_user_bp.put("/users/<int:user_id>/status")
-@admin_role_required("航司主管理员", "客服管理员")
+@admin_role_required("航司主管理员")
 def update_managed_user_status(user_id):
     """启用或禁用与当前航空公司产生过订单关系的普通用户。"""
     data = request.get_json(silent=True) or {}

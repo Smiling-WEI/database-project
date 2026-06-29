@@ -128,10 +128,17 @@ const handleLogin = async () => {
       return
     }
 
-    const isAdmin = [
+    const adminRoles = [
+      '航司管理员',
       '航空公司管理员',
-      '系统总管理员'
-    ].includes(user.role)
+      '系统总管理员',
+      '系统管理员',
+      '总管理员',
+      '管理员',
+      'admin'
+    ]
+
+    const isAdmin = adminRoles.includes(user.role)
 
     if (loginForm.role === 'admin' && !isAdmin) {
       ElMessage.error('该账号不是管理员账号')

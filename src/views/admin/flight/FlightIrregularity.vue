@@ -6,9 +6,16 @@
     <template #extra>
       <div class="page-actions">
         <el-button @click="goBack">返回航班列表</el-button>
-        <el-button type="primary" plain @click="affectedVisible = true">
+
+        <el-button
+          type="primary"
+          plain
+          @click="openAffectedDrawer"
+        >
           受影响订单（{{ affectedOrders.length }}）
         </el-button>
+
+        <template v-if="canEditIrregularityPage">
         <el-button
           type="warning"
           :disabled="!canEditIrregularities"
@@ -16,6 +23,7 @@
         >
           发布异常
         </el-button>
+      </template>
       </div>
     </template>
 
@@ -23,6 +31,14 @@
       v-if="!canEditIrregularities"
       title="当前岗位仅可查看航班异常记录，无权发布或解除异常"
       type="info"
+      :closable="false"
+      show-icon
+      class="permission-alert"
+    />
+
+    <el-alert
+      title="发布航班异常后，该航班相关有效订单在乘客退票时将自动按航司原因退票处理，手续费为 0。"
+      type="warning"
       :closable="false"
       show-icon
       class="permission-alert"
@@ -36,11 +52,17 @@
             {{ flight.status }}
           </el-tag>
         </div>
+
         <div class="flight-route">
           {{ flight.depAirport }} → {{ flight.arrAirport }}
         </div>
+
         <div class="flight-meta">
-          {{ flight.flightDate }} · {{ flight.airlineName }} · {{ flight.aircraftModel }}
+          {{ flight.flightDate }}
+          <span v-if="flight.depTime || flight.arrTime">
+            · {{ flight.depTime || '--' }} - {{ flight.arrTime || '--' }}
+          </span>
+          · {{ flight.airlineName }} · {{ flight.aircraftModel }}
         </div>
       </div>
 
@@ -48,6 +70,7 @@
         <span>生效中异常</span>
         <strong>{{ activeCount }}</strong>
       </div>
+
       <div class="affected-count">
         <span>受影响有效订单</span>
         <strong>{{ affectedOrders.length }}</strong>
@@ -64,7 +87,8 @@
         style="width: 100%"
         empty-text="当前航班暂无异常记录"
       >
-        <el-table-column prop="irregularityId" label="异常ID" width="100" />
+        <el-table-column prop="irregularityId" label="异常ID" width="95" />
+
         <el-table-column label="异常类型" width="120">
           <template #default="{ row }">
             <el-tag :type="getIrregularityType(row.irregularityType)">
@@ -72,19 +96,24 @@
             </el-tag>
           </template>
         </el-table-column>
+
         <el-table-column prop="responsibilityType" label="责任类型" width="120" />
+
         <el-table-column prop="description" label="异常说明" min-width="240">
           <template #default="{ row }">
             {{ row.description || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="publishedBy" label="发布人ID" width="110" />
+
+        <el-table-column prop="publishedBy" label="发布人ID" width="105" />
         <el-table-column prop="createdAt" label="发布时间" width="175" />
+
         <el-table-column prop="resolvedAt" label="解除时间" width="175">
           <template #default="{ row }">
             {{ row.resolvedAt || '-' }}
           </template>
         </el-table-column>
+
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === '生效中' ? 'danger' : 'info'">
@@ -92,15 +121,14 @@
             </el-tag>
           </template>
         </el-table-column>
+
         <el-table-column label="操作" fixed="right" width="100">
           <template #default="{ row }">
             <el-button
               v-if="row.status === '生效中'"
               type="success"
-              link
-              :disabled="!canEditIrregularities"
-              @click="handleResolve(row)"
-            >
+              link @click="handleResolve(row)"
+             :disabled="(!canEditIrregularities) || (!canEditIrregularityPage)">
               解除
             </el-button>
             <span v-else class="resolved-text">已解除</span>
@@ -155,6 +183,13 @@
             placeholder="请输入异常原因、预计影响或处理说明"
           />
         </el-form-item>
+
+        <el-alert
+          title="发布后，该航班的受影响乘客退票将自动按航司原因退票规则处理，手续费为 0。"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
       </el-form>
 
       <template #footer>
@@ -175,7 +210,7 @@
       size="72%"
     >
       <el-alert
-        title="仅展示当前仍可处理的有效订单，可直接进入后台改签流程。"
+        title="仅展示当前航班仍在 active_ticket_sale 中的有效订单。乘客自行退票时，系统会自动走航司原因免费退票。"
         type="info"
         :closable="false"
         show-icon
@@ -195,26 +230,24 @@
         <el-table-column prop="phone" label="联系电话" width="135" />
         <el-table-column prop="cabinType" label="舱位" width="100" />
         <el-table-column prop="seatNo" label="座位号" width="100" />
+
         <el-table-column label="票价" width="110">
-          <template #default="{ row }">¥{{ Number(row.price || 0).toFixed(2) }}</template>
+          <template #default="{ row }">
+            ¥{{ Number(row.price || 0).toFixed(2) }}
+          </template>
         </el-table-column>
-        <el-table-column label="处理状态" width="110">
+
+        <el-table-column label="处理状态" width="120">
           <template #default="{ row }">
             <el-tag :type="row.handlingStatus === '已处理' ? 'success' : 'warning'">
               {{ row.handlingStatus || '待处理' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" fixed="right" width="110">
-          <template #default="{ row }">
-            <el-button
-              type="warning"
-              link
-              :disabled="!canEditIrregularities || row.handlingStatus === '已处理'"
-              @click="goAssistChange(row)"
-            >
-              代办改签
-            </el-button>
+
+        <el-table-column label="建议处理" min-width="180">
+          <template #default>
+            免费退票 / 免费改签
           </template>
         </el-table-column>
       </el-table>
@@ -227,6 +260,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import PageContainer from '../../../components/admin/PageContainer.vue'
+import { canWriteFlightModule } from '../../../utils/adminAuth'
 import {
   createFlightIrregularity,
   getAffectedOrders,
@@ -243,6 +277,7 @@ const route = useRoute()
 const router = useRouter()
 const formRef = ref()
 
+const canEditIrregularityPage = computed(() => canWriteFlightModule())
 const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
@@ -255,13 +290,14 @@ const affectedLoading = ref(false)
 const instanceId = computed(() => Number(route.params.instanceId))
 const currentUser = computed(() => getStoredUser())
 const canEditIrregularities = computed(() => canManageFlights(currentUser.value))
+
 const activeCount = computed(() => {
   return irregularityList.value.filter((item) => item.status === '生效中').length
 })
 
 const irregularityForm = reactive({
   irregularityType: '',
-  responsibilityType: '',
+  responsibilityType: '航司原因',
   description: ''
 })
 
@@ -302,23 +338,27 @@ const loadData = async () => {
 
 const loadAffectedOrders = async () => {
   affectedLoading.value = true
+
   try {
     const response = await getAffectedOrders(instanceId.value)
     affectedOrders.value = response.data.data || []
   } catch (error) {
     affectedOrders.value = []
-    ElMessage.warning(
-      error.response?.data?.message ||
-      '受影响订单接口待后端接入'
-    )
+    ElMessage.warning(error.response?.data?.message || '受影响订单加载失败')
+    console.error(error)
   } finally {
     affectedLoading.value = false
   }
 }
 
+const openAffectedDrawer = async () => {
+  affectedVisible.value = true
+  await loadAffectedOrders()
+}
+
 const resetForm = () => {
   irregularityForm.irregularityType = ''
-  irregularityForm.responsibilityType = ''
+  irregularityForm.responsibilityType = '航司原因'
   irregularityForm.description = ''
   formRef.value?.clearValidate()
 }
@@ -332,7 +372,6 @@ const handleSubmit = async () => {
   if (!canEditIrregularities.value || !formRef.value) return
 
   const valid = await formRef.value.validate().catch(() => false)
-
   if (!valid) return
 
   submitting.value = true
@@ -382,23 +421,12 @@ const goBack = () => {
   router.push('/admin/flights')
 }
 
-const goAssistChange = (row) => {
-  router.push({
-    path: '/admin/orders',
-    query: {
-      orderId: row.orderId,
-      action: 'change',
-      irregularityId: irregularityList.value.find(
-        (item) => item.status === '生效中'
-      )?.irregularityId || ''
-    }
-  })
-}
-
 const getFlightStatusType = (status) => {
   if (status === '正常') return 'success'
   if (status === '延误') return 'warning'
   if (status === '取消') return 'danger'
+  if (status === '航班调整') return 'warning'
+  if (status === '已完成') return 'info'
   return 'info'
 }
 
@@ -455,18 +483,7 @@ onMounted(() => {
   font-size: 13px;
 }
 
-.active-count {
-  min-width: 130px;
-  padding: 14px 18px;
-  display: flex;
-  flex-direction: column;
-  border-radius: 14px;
-  color: #64748b;
-  font-size: 13px;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
-}
-
+.active-count,
 .affected-count {
   min-width: 145px;
   padding: 14px 18px;
@@ -475,6 +492,14 @@ onMounted(() => {
   border-radius: 14px;
   color: #64748b;
   font-size: 13px;
+}
+
+.active-count {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.affected-count {
   background: #eff6ff;
   border: 1px solid #bfdbfe;
 }
