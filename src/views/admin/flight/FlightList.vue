@@ -7,8 +7,7 @@
       <el-button
         type="primary"
         :disabled="!canManageFlights || isFlightReadonly(row)"
-        @click="goAddFlight"
-      >
+        @click="goAddFlight" v-if="canCurrentAdminWriteFlightBusiness">
         <el-icon><Plus /></el-icon>
         新增航班
       </el-button>
@@ -127,14 +126,14 @@
               type="success"
               link
               @click="goPricing(row)"
-            >
+             v-if="canCurrentAdminWriteFlightBusiness">
               票价
             </el-button>
 
             <el-button
               type="warning"
               link
-              :disabled="!canEditFlightPage" @click="goIrregularity(row)"
+              :disabled="!canCurrentAdminWriteFlightBusiness" @click="goIrregularity(row)"
             >
               异常
             </el-button>
@@ -156,6 +155,60 @@
 </template>
 
 <script setup>
+
+const getCurrentAdminForFlightWrite = () => {
+  const keys = ['user', 'currentUser', 'adminInfo', 'adminUser', 'currentAdmin']
+
+  for (const key of keys) {
+    const raw = localStorage.getItem(key) || sessionStorage.getItem(key)
+    if (!raw) continue
+
+    try {
+      const value = JSON.parse(raw)
+      if (value && typeof value === 'object') return value
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  return {}
+}
+
+const canCurrentAdminWriteFlightBusiness = computed(() => {
+  const admin = getCurrentAdminForFlightWrite()
+
+  const adminRole = String(admin.admin_role || admin.adminRole || '').trim()
+  const systemRole = String(admin.role || admin.userRole || admin.user_role || '').trim()
+
+  // 最关键：订单管理员必须优先判定为只读，不能被 role=航司管理员 误放行
+  if (adminRole === '订单管理员') {
+    return false
+  }
+
+  if (
+    adminRole === '系统总管理员' ||
+    adminRole === '平台总管理员' ||
+    adminRole === '总管理员' ||
+    systemRole === '系统总管理员' ||
+    systemRole === '平台总管理员' ||
+    systemRole === '总管理员'
+  ) {
+    return true
+  }
+
+  if (adminRole === '航司主管理员') {
+    return true
+  }
+
+  if (adminRole === '航班管理员') {
+    return true
+  }
+
+  return false
+})
+
+
+
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'

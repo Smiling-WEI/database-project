@@ -242,9 +242,59 @@ const __adminTextForFlightPermission = () => {
 }
 
 export const canWriteFlightModule = () => {
-  const texts = __adminTextForFlightPermission()
+  const admin = __readAdminForFlightPermission ? __readAdminForFlightPermission() : {}
 
-  return texts.some((item) =>
-    ['系统总管理员', '平台总管理员', '总管理员', '航司主管理员', '航班管理员'].includes(item)
-  )
+  const texts = [
+    admin.role,
+    admin.userRole,
+    admin.user_role,
+    admin.adminRole,
+    admin.admin_role,
+    admin.roleName,
+    admin.role_name,
+    admin.position,
+    admin.post,
+    admin.job,
+    admin.title,
+    admin.realName,
+    admin.real_name,
+    admin.name,
+    admin.displayName,
+    admin.display_name,
+    admin.username
+  ].filter(Boolean).map((item) => String(item).trim())
+
+  // 系统总管理员：一定可写
+  if (texts.some((item) =>
+    item.includes('系统总管理员') ||
+    item.includes('平台总管理员') ||
+    item === '总管理员'
+  )) {
+    return true
+  }
+
+  // 航司主管理员：一定可写航班、票价、异常
+  if (texts.some((item) =>
+    item.includes('航司主管理员') ||
+    item.includes('航空公司主管理员') ||
+    item.includes('主管理员')
+  )) {
+    return true
+  }
+
+  // 航班管理员：可写航班、票价、异常
+  if (texts.some((item) =>
+    item.includes('航班管理员')
+  )) {
+    return true
+  }
+
+  // 订单管理员：只读航班、票价、异常
+  if (texts.some((item) =>
+    item.includes('订单管理员')
+  )) {
+    return false
+  }
+
+  return false
 }

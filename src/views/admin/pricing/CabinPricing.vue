@@ -6,16 +6,12 @@
           <h2>舱位票价管理</h2>
           <p>查看航班舱位余票，维护票价及其生效时间</p>
         </div>
-
-        <template v-if="canEditPricingPage">
-        <el-button
+        <el-button :disabled="!canOperatePricingByAdminRole"
           type="primary"
-          :disabled="!selectedInstanceId"
           @click="openCreateDialog"
         >
           + 新增价格
         </el-button>
-      </template>
       </div>
 
       <div class="select-card">
@@ -109,7 +105,7 @@
 
           <el-table-column label="操作" fixed="right" width="100">
             <template #default="{ row }">
-              <el-button type="primary" link :disabled="!canEditPricingPage" @click="openEditDialog(row)">
+              <el-button type="primary" link :disabled="!canOperatePricingByAdminRole" @click="openEditDialog(row)">
                 编辑
               </el-button>
             </template>
@@ -189,7 +185,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import PageContainer from '../../../components/admin/PageContainer.vue'
-import { canWriteFlightModule } from '../../../utils/adminAuth'
 import {
   createPricingCabin,
   getPricingCabins,
@@ -197,6 +192,97 @@ import {
   updatePricingCabin
 } from '../../../api/admin/cabinPricingDirect'
 
+
+
+
+// ===== 单一来源票价权限判断：优先按当前 token 的 admin_role 判断 =====
+const decodePricingTokenPayload = () => {
+  const token = localStorage.getItem('token') || sessionStorage.getItem('token') || ''
+
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return {}
+
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const json = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((char) => '%' + ('00' + char.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    )
+
+    return JSON.parse(json)
+  } catch (error) {
+    return {}
+  }
+}
+
+const getPricingAdminRole = () => {
+  const tokenPayload = decodePricingTokenPayload()
+  const tokenAdminRole = String(tokenPayload.admin_role || tokenPayload.adminRole || '').trim()
+
+  // 以当前 token 为准，避免 localStorage 里残留旧账号导致权限错乱
+  if (tokenAdminRole) {
+    return tokenAdminRole
+  }
+
+  // token 异常时才降级读取本地用户信息
+  const keys = ['currentUser', 'user', 'adminInfo', 'adminUser', 'currentAdmin']
+
+  for (const key of keys) {
+    const raw = localStorage.getItem(key) || sessionStorage.getItem(key)
+    if (!raw) continue
+
+    try {
+      const admin = JSON.parse(raw)
+      const adminRole = String(admin.admin_role || admin.adminRole || '').trim()
+
+      if (adminRole) {
+        return adminRole
+      }
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  return ''
+}
+
+const canOperatePricingByAdminRole = computed(() => {
+  const adminRole = getPricingAdminRole()
+
+  // 订单管理员只能处理订单退改，绝对不能改票价
+  if (adminRole === '订单管理员') {
+    return false
+  }
+
+  return [
+    '系统总管理员',
+    '平台总管理员',
+    '总管理员',
+    '航司主管理员',
+    '航班管理员'
+  ].includes(adminRole)
+})
+
+
+const getCurrentAdminRoleForPricing = () => {
+  const keys = ['user', 'currentUser', 'adminInfo', 'adminUser', 'currentAdmin']
+
+  for (const key of keys) {
+    const raw = localStorage.getItem(key) || sessionStorage.getItem(key)
+    if (!raw) continue
+
+    try {
+      const admin = JSON.parse(raw)
+      return String(admin.admin_role || admin.adminRole || '').trim()
+    } catch (error) {
+      // ignore
+    }
+  }
+
+  return ''
+}
 const route = useRoute()
 const router = useRouter()
 
@@ -401,7 +487,7 @@ const loadCabins = async () => {
 
 const openCreateDialog = () => {
   const openCreateDialogPermissionGuard = true
-  if (!canEditPricingPage.value) {
+  if (!canOperatePricingByAdminRole.value) {
     ElMessage.warning('当前岗位仅可查看舱位票价，无权新增或修改票价')
     return
   }
@@ -415,7 +501,7 @@ const openCreateDialog = () => {
 
 const openEditDialog = (row) => {
   const openEditDialogPermissionGuard = true
-  if (!canEditPricingPage.value) {
+  if (!canOperatePricingByAdminRole.value) {
     ElMessage.warning('当前岗位仅可查看舱位票价，无权新增或修改票价')
     return
   }

@@ -138,9 +138,23 @@ def _require_flight_write_permission():
     return None
 
 
+
+def _forbid_order_admin_write_pricing():
+    current_user = getattr(g, "current_user", {}) or {}
+    admin_role = current_user.get("admin_role")
+
+    if admin_role == "订单管理员":
+        return error_response("当前岗位仅可查看舱位票价，无权新增或修改票价", 403)
+
+    return None
+
+
 @admin_pricing_bp.post("/flights/<int:instance_id>/cabins")
 @admin_role_required("航司主管理员", "航班管理员")
 def create_cabin_pricing(instance_id):
+    pricing_permission_error = _forbid_order_admin_write_pricing()
+    if pricing_permission_error is not None:
+        return pricing_permission_error
     permission_error = _require_flight_write_permission()
     if permission_error is not None:
         return permission_error
@@ -406,6 +420,9 @@ def get_flight_cabins(instance_id):
 @admin_pricing_bp.put("/cabins/<int:pricing_id>")
 @admin_role_required("航司主管理员", "航班管理员")
 def update_cabin_pricing(pricing_id):
+    pricing_permission_error = _forbid_order_admin_write_pricing()
+    if pricing_permission_error is not None:
+        return pricing_permission_error
     permission_error = _require_flight_write_permission()
     if permission_error is not None:
         return permission_error

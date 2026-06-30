@@ -120,48 +120,57 @@ def calculate_change_amounts(
     rule,
     change_type,
 ):
-    """计算差价、手续费、应补金额和应退金额。"""
+    """计算差价、手续费、应补金额和应退金额。
+
+    采用净额结算：
+    - 新票更贵：应补 = 正差价 + 改签手续费
+    - 新票更便宜：应退 = 可退负差价 - 改签手续费
+    - 如果手续费大于可退负差价，则应补 = 手续费 - 可退负差价
+    """
     old_price = to_money(old_ticket_price)
     new_price = to_money(new_ticket_price)
     fare_difference = to_money(new_price - old_price)
 
     # 航司原因同航司改签：
-    # 免手续费，且不补差价、不退差价。也就是免费安排到同航司替代航班。
+    # 免手续费，不补差价，不退差价。
     if change_type == "航司原因同航司改签":
         change_fee = to_money(0)
         payable_amount = to_money(0)
         refundable_amount = to_money(0)
 
     else:
-        # 乘客主动改签：
-        # 按规则收手续费，并根据规则处理正负差价。
-        #
-        # 航司原因跨航司改签：
-        # 对应规则应设置 fee_rate=0，charge_positive_difference=True，
-        # 即免手续费，但如果新票更贵，需要补正差价。
+        # 改签手续费按原票价和规则费率计算
         change_fee = to_money(
             old_price * Decimal(str(rule["fee_rate"]))
         )
 
+        # 正差价：新票价高于原票价
         positive_difference = (
             max(fare_difference, to_money(0))
             if bool(rule["charge_positive_difference"])
             else to_money(0)
         )
 
+        # 负差价：新票价低于原票价
         negative_difference = (
             max(-fare_difference, to_money(0))
             if bool(rule["refund_negative_difference"])
             else to_money(0)
         )
 
-        payable_amount = to_money(
-            change_fee + positive_difference
+        # 净额结算：
+        # net_amount > 0 表示乘客还要补钱
+        # net_amount < 0 表示应退给乘客
+        net_amount = to_money(
+            change_fee + positive_difference - negative_difference
         )
 
-        refundable_amount = to_money(
-            negative_difference
-        )
+        if net_amount >= to_money(0):
+            payable_amount = net_amount
+            refundable_amount = to_money(0)
+        else:
+            payable_amount = to_money(0)
+            refundable_amount = to_money(-net_amount)
 
     return {
         "old_ticket_price": old_price,
@@ -171,3 +180,5 @@ def calculate_change_amounts(
         "payable_amount": payable_amount,
         "refundable_amount": refundable_amount,
     }
+
+

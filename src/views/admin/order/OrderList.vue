@@ -210,67 +210,67 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog
+    <el-dialog class="assist-order-dialog" modal-class="assist-order-overlay" top="2vh" :append-to-body="true"
       v-model="detailVisible"
       title="订单详情"
       width="620px"
     >
-      <div v-if="currentOrder" class="detail-box">
-        <div class="detail-row">
+      <div v-if="currentOrder">
+        <div>
           <span>订单ID</span>
           <strong>{{ formatValue(currentOrder.orderId) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>用户ID</span>
           <strong>{{ formatValue(currentOrder.userId) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>用户账号</span>
           <strong>{{ formatValue(currentOrder.username) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>用户手机号</span>
           <strong>{{ maskPhone(currentOrder.phone) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>乘机人</span>
           <strong>{{ formatValue(currentOrder.passengerName) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>乘机人证件</span>
           <strong>{{ formatValue(currentOrder.passengerIdCard) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>航班号</span>
           <strong>{{ formatValue(currentOrder.flightNo) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>航班日期</span>
           <strong>{{ formatValue(currentOrder.flightDate) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>舱位</span>
           <strong>{{ formatValue(currentOrder.cabinType) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>座位号</span>
           <strong>{{ formatValue(currentOrder.seatNo) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>票价</span>
           <strong>{{ formatPrice(currentOrder.price) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>购票时间</span>
           <strong>{{ formatValue(currentOrder.purchaseTime) }}</strong>
         </div>
-        <div class="detail-row">
+        <div>
           <span>订单状态</span>
           <el-tag :type="getOrderStatusType(currentOrder.orderStatus)">
             {{ currentOrder.orderStatus || '未知' }}
           </el-tag>
         </div>
-        <div class="detail-row">
+        <div>
           <span>记录类型</span>
           <el-tag :type="getRecordType(currentOrder.recordType)">
             {{ currentOrder.recordType || '未知' }}
@@ -299,13 +299,14 @@
       </template>
     </el-dialog>
 
-    <el-dialog
+    <el-dialog class="assist-order-dialog" top="2vh" :append-to-body="true"
       v-model="assistVisible"
       :title="assistType === 'refund' ? '后台代办退票' : '后台代办改签'"
       width="680px"
       @closed="resetAssistForm"
     >
-      <el-alert
+<div class="assist-order-dialog-body-scroll">
+<el-alert
         :title="assistType === 'refund'
           ? '系统将按当前有效退票规则计算手续费与实际退款金额'
           : '系统将按当前有效改签规则计算票价差额与改签手续费'"
@@ -430,8 +431,8 @@
           </div>
         </template>
       </div>
-
-      <template #footer>
+</div><!-- assist-order-dialog-body-scroll-end -->
+<template #footer>
         <el-button @click="assistVisible = false">取消</el-button>
         <el-button
           :loading="previewing"
@@ -1052,5 +1053,46 @@ onMounted(() => {
 
 :deep(.el-table .cell) {
   line-height: 1.4;
+}
+</style>
+
+
+
+
+
+
+
+
+<style>
+.assist-order-dialog.el-dialog {
+  max-height: 92vh !important;
+  margin-top: 2vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.assist-order-dialog .el-dialog__header {
+  flex-shrink: 0 !important;
+}
+
+.assist-order-dialog .el-dialog__body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.assist-order-dialog-body-scroll {
+  max-height: calc(92vh - 150px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-right: 14px !important;
+}
+
+.assist-order-dialog .el-dialog__footer {
+  flex-shrink: 0 !important;
+  background: #ffffff !important;
+  border-top: 1px solid #eef1f6 !important;
+  padding-top: 12px !important;
 }
 </style>
